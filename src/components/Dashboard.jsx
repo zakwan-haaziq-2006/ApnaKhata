@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useLanguage } from './LanguageContext';
+import { useLanguage } from './LanguageContext.js';
 import {
   IndianRupee,
   Bell,
@@ -1214,7 +1214,6 @@ export default function Dashboard() {
         const shop = data.shop;
         setCookie('apna_khata_session_user', shop.id, 7);
         setCookie('apna_khata_session_role', 'merchant', 7);
-        setCookie('apna_khata_session_key', passwordInput, 7); 
 
         setCurrentMerchant(shop);
         setSessionUser(shop.id);
@@ -1242,26 +1241,27 @@ export default function Dashboard() {
       return;
     }
 
-    if (usernameInput === 'zakwan_admin' && passwordInput === 'zakwan@apnakhata') {
-      setCookie('apna_khata_session_user', 'zakwan_admin', 1);
-      setCookie('apna_khata_session_role', 'admin', 1);
-      setCookie('apna_khata_session_key', passwordInput, 1); 
-
-      setSessionUser('zakwan_admin');
-      setSessionRole('admin');
-      triggerToast('Welcome Super Admin Zakwan!', 'success');
-      
-      setUsernameInput('');
-      setPasswordInput('');
-    } else {
-      triggerToast('Invalid Super Admin credentials!', 'error');
-    }
+    apiCall('/api/auth/admin-login', {
+      method: 'POST',
+      body: JSON.stringify({ username: usernameInput, password: passwordInput })
+    })
+      .then(data => {
+        setCookie('apna_khata_session_user', data.user, 1);
+        setCookie('apna_khata_session_role', 'admin', 1);
+        setSessionUser(data.user);
+        setSessionRole('admin');
+        triggerToast('Welcome Super Admin!', 'success');
+        setUsernameInput('');
+        setPasswordInput('');
+      })
+      .catch(() => {
+        triggerToast('Invalid Super Admin credentials!', 'error');
+      });
   };
 
   const handleLogout = () => {
     deleteCookie('apna_khata_session_user');
     deleteCookie('apna_khata_session_role');
-    deleteCookie('apna_khata_session_key');
     
     setSessionUser(null);
     setSessionRole(null);
@@ -1659,11 +1659,13 @@ export default function Dashboard() {
                   </button>
                 </form>
 
-                <div className="p-3 bg-blue-50/50 border border-blue-100/50 rounded-2xl text-[10px] text-slate-500">
-                  <p className="font-bold text-blue-800">💡 Super Admin Credentials:</p>
-                  <p className="mt-1">• Username: <span className="text-blue-600 font-semibold">admin</span></p>
-                  <p>• Password: <span className="text-blue-600 font-semibold">admin_password</span></p>
-                </div>
+                {import.meta.env.DEV && (
+                  <div className="p-3 bg-blue-50/50 border border-blue-100/50 rounded-2xl text-[10px] text-slate-500">
+                    <p className="font-bold text-blue-800">💡 Super Admin Credentials (dev only):</p>
+                    <p className="mt-1">• Username: <span className="text-blue-600 font-semibold">zakwan_admin</span></p>
+                    <p>• Password: <span className="text-blue-600 font-semibold">zakwan@apnakhata</span></p>
+                  </div>
+                )}
               </div>
             </div>
           ) : (

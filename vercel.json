@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://your-backend-url.onrender.com/api/:path*"
+      "destination": "https://apnakhata-fa05.onrender.com/api/:path*"
     },
     {
       "source": "/(.*)",
