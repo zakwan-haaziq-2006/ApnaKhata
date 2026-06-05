@@ -222,6 +222,19 @@ export default function Dashboard() {
   const [pendingPaymentShopId, setPendingPaymentShopId] = useState(null);
   const [pendingPaymentShopName, setPendingPaymentShopName] = useState('');
 
+  // --- Pricing Login State ---
+  const [showPricingLoginModal, setShowPricingLoginModal] = useState(false);
+  const [pricingLoginUsername, setPricingLoginUsername] = useState('');
+  const [pricingLoginPassword, setPricingLoginPassword] = useState('');
+  const [pricingLoginShowPassword, setPricingLoginShowPassword] = useState(false);
+  const [selectedPlanInfo, setSelectedPlanInfo] = useState(null); // { months, amount }
+
+  // --- Simulated Payment Gateway State ---
+  const [showSimulatedGateway, setShowSimulatedGateway] = useState(false);
+  const [simulatedPaymentDetails, setSimulatedPaymentDetails] = useState(null); // { shopId, shopName, months, amount, orderId }
+  const [isSimulatingPayment, setIsSimulatingPayment] = useState(false);
+  const [simulatedStatus, setSimulatedStatus] = useState('pending'); // 'pending', 'processing', 'success', 'failed'
+
   // --- General View & Form States ---
   const [activeTab, setActiveTab] = useState('home'); 
   const [showNotifications, setShowNotifications] = useState(false);
@@ -1347,6 +1360,100 @@ export default function Dashboard() {
     });
   };
 
+  const handlePricingLoginSubmit = (e) => {
+    e.preventDefault();
+    if (!pricingLoginUsername || !pricingLoginPassword) {
+      triggerToast('Please fill all fields', 'error');
+      return;
+    }
+
+    apiCall('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ username: pricingLoginUsername, password: pricingLoginPassword })
+    })
+      .then(data => {
+        const shop = data.shop;
+        setCookie('apna_khata_session_user', shop.id, 7);
+        setCookie('apna_khata_session_role', 'merchant', 7);
+
+        setCurrentMerchant(shop);
+        setSessionUser(shop.id);
+        setSessionRole('merchant');
+        triggerToast(`Signed in successfully!`, 'success');
+        
+        setShowPricingLoginModal(false);
+        setPricingLoginUsername('');
+        setPricingLoginPassword('');
+
+        if (selectedPlanInfo) {
+          setPendingPaymentShopId(shop.id);
+          setPendingPaymentShopName(shop.shopName);
+          handleRenewSubscriptionForShop(shop.id, shop.shopName, selectedPlanInfo.months, selectedPlanInfo.amount);
+        }
+      })
+      .catch(err => {
+        if (err.status === 403 && err.data?.shopId) {
+          setShowPricingLoginModal(false);
+          setPricingLoginUsername('');
+          setPricingLoginPassword('');
+          
+          setPendingPaymentShopId(err.data.shopId);
+          setPendingPaymentShopName(err.data.shopName || err.data.shopId);
+          triggerToast('Account verified! Proceeding to payment...', 'info');
+          
+          if (selectedPlanInfo) {
+            handleRenewSubscriptionForShop(err.data.shopId, err.data.shopName || err.data.shopId, selectedPlanInfo.months, selectedPlanInfo.amount);
+          }
+        } else {
+          triggerToast(err.message || 'Incorrect credentials!', 'error');
+        }
+      });
+  };
+
+  const handleConfirmSimulatedPayment = async () => {
+    if (!simulatedPaymentDetails) return;
+    setIsSimulatingPayment(true);
+    setSimulatedStatus('processing');
+
+    setTimeout(async () => {
+      try {
+        const verifyData = await apiCall('/api/payments/verify', {
+          method: 'POST',
+          body: JSON.stringify({
+            shopId: simulatedPaymentDetails.shopId,
+            amount: simulatedPaymentDetails.amount
+          })
+        });
+
+        if (verifyData.success) {
+          setSimulatedStatus('success');
+          setTimeout(() => {
+            triggerToast('Payment successful! Subscription activated.', 'success');
+            setShowSimulatedGateway(false);
+            setSimulatedPaymentDetails(null);
+            setPendingPaymentShopId(null);
+            
+            const shop = verifyData.shop;
+            if (currentMerchant) {
+              setCurrentMerchant(shop);
+            } else {
+              setCookie('apna_khata_session_user', shop.id, 7);
+              setCookie('apna_khata_session_role', 'merchant', 7);
+              setCurrentMerchant(shop);
+              setSessionUser(shop.id);
+              setSessionRole('merchant');
+            }
+            navigate('/');
+          }, 1000);
+        }
+      } catch (err) {
+        setSimulatedStatus('failed');
+        setIsSimulatingPayment(false);
+        triggerToast(err.message || 'Simulated payment verification failed', 'error');
+      }
+    }, 2000);
+  };
+
   const handleRenewSubscription = async (months, amount) => {
     const scriptLoaded = await loadRazorpayScript();
     if (!scriptLoaded) {
@@ -1357,10 +1464,15 @@ export default function Dashboard() {
     const activeShopId = pendingPaymentShopId || currentMerchant?.id;
     const activeShopName = pendingPaymentShopName || currentMerchant?.shopName;
     if (!activeShopId) {
-      triggerToast('No active merchant session found', 'error');
+      setSelectedPlanInfo({ months, amount });
+      setShowPricingLoginModal(true);
       return;
     }
 
+    handleRenewSubscriptionForShop(activeShopId, activeShopName, months, amount);
+  };
+
+  const handleRenewSubscriptionForShop = async (activeShopId, activeShopName, months, amount) => {
     try {
       const data = await apiCall('/api/payments/create-order', {
         method: 'POST',
@@ -1372,29 +1484,16 @@ export default function Dashboard() {
       });
 
       if (data.isMock) {
-        // Handle mock flow
-        const verifyData = await apiCall('/api/payments/verify', {
-          method: 'POST',
-          body: JSON.stringify({
-            shopId: activeShopId,
-            amount: amount
-          })
+        setSimulatedPaymentDetails({
+          shopId: activeShopId,
+          shopName: activeShopName,
+          months: months,
+          amount: amount,
+          orderId: data.order.id,
+          keyId: data.keyId
         });
-
-        if (verifyData.success) {
-          triggerToast('Payment successful! (Simulated Mode)', 'success');
-          setPendingPaymentShopId(null);
-          const shop = verifyData.shop;
-          if (currentMerchant) {
-            setCurrentMerchant(shop);
-          } else {
-            setCookie('apna_khata_session_user', shop.id, 7);
-            setCookie('apna_khata_session_role', 'merchant', 7);
-            setCurrentMerchant(shop);
-            setSessionUser(shop.id);
-            setSessionRole('merchant');
-          }
-        }
+        setSimulatedStatus('pending');
+        setShowSimulatedGateway(true);
         return;
       }
 
@@ -3934,6 +4033,245 @@ export default function Dashboard() {
                 ← Back to Dashboard
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pricing Login Modal */}
+      {showPricingLoginModal && (
+        <div className="fixed inset-0 z-50 bg-black/45 backdrop-blur-xs flex items-center justify-center p-4 font-sans">
+          <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-6 space-y-5 border border-slate-100 animate-slide-up text-slate-800">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="text-base font-black text-slate-800">Merchant Authentication</h3>
+                {selectedPlanInfo && (
+                  <p className="text-xs text-slate-400 mt-1">
+                    Sign in to purchase <span className="font-bold text-blue-600">{selectedPlanInfo.months === 1 ? '1 Month' : selectedPlanInfo.months === 3 ? '3 Months' : '1 Year'} plan (₹{selectedPlanInfo.amount})</span>
+                  </p>
+                )}
+              </div>
+              <button 
+                onClick={() => setShowPricingLoginModal(false)}
+                className="w-8 h-8 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                <X className="w-4.5 h-4.5" />
+              </button>
+            </div>
+
+            <form onSubmit={handlePricingLoginSubmit} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block pl-1">Store Username</label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400" />
+                  <input 
+                    type="text" 
+                    required
+                    value={pricingLoginUsername}
+                    onChange={(e) => setPricingLoginUsername(e.target.value)}
+                    placeholder="Store ID (e.g. rajan)"
+                    className="w-full pl-9 pr-4 py-3 rounded-xl bg-slate-50 border border-slate-100 text-sm focus:outline-none focus:border-blue-500 text-slate-800 placeholder-slate-400 font-semibold"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block pl-1">Security Password</label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400" />
+                  <input 
+                    type={pricingLoginShowPassword ? "text" : "password"} 
+                    required
+                    value={pricingLoginPassword}
+                    onChange={(e) => setPricingLoginPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full pl-9 pr-10 py-3 rounded-xl bg-slate-50 border border-slate-100 text-sm focus:outline-none focus:border-blue-500 text-slate-800 placeholder-slate-400 font-semibold"
+                  />
+                  <button 
+                    type="button"
+                    onClick={() => setPricingLoginShowPassword(!pricingLoginShowPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                  >
+                    {pricingLoginShowPassword ? <EyeOff className="w-4.5 h-4.5" /> : <Eye className="w-4.5 h-4.5" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button 
+                  type="button"
+                  onClick={() => setShowPricingLoginModal(false)}
+                  className="flex-1 py-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-500 font-bold text-xs transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  className="flex-1 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs shadow-md shadow-blue-500/10 active:scale-98 transition-all cursor-pointer"
+                >
+                  Verify & Pay
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Simulated Razorpay Payment Gateway Modal */}
+      {showSimulatedGateway && simulatedPaymentDetails && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 font-sans select-none">
+          <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-100 flex flex-col max-h-[90%] text-slate-800 animate-scale-up">
+            
+            <div className="bg-[#1e293b] p-5 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-md bg-blue-500 flex items-center justify-center font-black text-xs text-white">AK</div>
+                <div>
+                  <h3 className="text-sm font-black tracking-tight leading-none">ApnaKhata Payments</h3>
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1 block">Simulated Gateway</span>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 uppercase tracking-wider block">TEST MODE</span>
+              </div>
+            </div>
+
+            <div className="p-5 flex-1 overflow-y-auto space-y-5">
+              
+              {simulatedStatus === 'pending' && (
+                <>
+                  <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Store Workspace</span>
+                      <span className="text-xs font-bold text-slate-800">{simulatedPaymentDetails.shopName}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Selected Plan</span>
+                      <span className="text-xs font-bold text-slate-800">
+                        {simulatedPaymentDetails.months === 1 ? '1 Month Premium' : simulatedPaymentDetails.months === 3 ? '3 Months Saver' : '1 Year Value'}
+                      </span>
+                    </div>
+                    <div className="border-t border-slate-200/50 pt-2.5 flex justify-between items-center">
+                      <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Total Amount</span>
+                      <span className="text-base font-black text-blue-600">₹{simulatedPaymentDetails.amount}</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-widest pl-0.5 block">Select Simulation Result</span>
+                    
+                    <button 
+                      onClick={handleConfirmSimulatedPayment}
+                      disabled={isSimulatingPayment}
+                      className="w-full p-4 rounded-xl border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/10 flex items-center justify-between transition-all group cursor-pointer"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 group-hover:bg-emerald-100">
+                          <Check className="w-4.5 h-4.5 stroke-[2.5]" />
+                        </div>
+                        <div className="text-left">
+                          <span className="text-xs font-extrabold text-slate-800 block">Simulate Success</span>
+                          <span className="text-[10px] text-slate-400 block font-medium">Instantly updates store plan to active</span>
+                        </div>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-emerald-500" />
+                    </button>
+
+                    <button 
+                      onClick={() => {
+                        setIsSimulatingPayment(true);
+                        setSimulatedStatus('processing');
+                        setTimeout(() => {
+                          setSimulatedStatus('failed');
+                          setIsSimulatingPayment(false);
+                          triggerToast('Simulated payment failed!', 'error');
+                        }, 1500);
+                      }}
+                      disabled={isSimulatingPayment}
+                      className="w-full p-4 rounded-xl border border-slate-200 hover:border-rose-500 hover:bg-rose-50/10 flex items-center justify-between transition-all group cursor-pointer"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-rose-50 flex items-center justify-center text-rose-600 group-hover:bg-rose-100">
+                          <X className="w-4.5 h-4.5 stroke-[2.5]" />
+                        </div>
+                        <div className="text-left">
+                          <span className="text-xs font-extrabold text-slate-800 block">Simulate Failure</span>
+                          <span className="text-[10px] text-slate-400 block font-medium">Simulates a transaction reject or timeout</span>
+                        </div>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-rose-500" />
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {simulatedStatus === 'processing' && (
+                <div className="py-10 flex flex-col items-center justify-center text-center space-y-4 animate-pulse">
+                  <div className="w-12 h-12 border-4 border-slate-200 border-t-blue-600 rounded-full animate-spin" />
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-800">Processing Payment</h4>
+                    <p className="text-[10px] text-slate-400 mt-1">Simulating bank authentication. Please wait...</p>
+                  </div>
+                </div>
+              )}
+
+              {simulatedStatus === 'success' && (
+                <div className="py-8 flex flex-col items-center justify-center text-center space-y-4">
+                  <div className="w-14 h-14 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 animate-bounce">
+                    <Check className="w-7 h-7 stroke-[3]" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-black text-slate-800">Payment Successful!</h4>
+                    <p className="text-[10px] text-emerald-600 font-bold mt-1">Activating store plan workspace...</p>
+                  </div>
+                </div>
+              )}
+
+              {simulatedStatus === 'failed' && (
+                <div className="py-8 flex flex-col items-center justify-center text-center space-y-4">
+                  <div className="w-14 h-14 rounded-full bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600">
+                    <X className="w-7 h-7 stroke-[3]" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-black text-slate-800">Transaction Failed</h4>
+                    <p className="text-[10px] text-rose-600 font-bold mt-1">The simulated payment was cancelled or declined.</p>
+                  </div>
+                  <div className="flex gap-2.5 pt-2 w-full">
+                    <button
+                      onClick={() => {
+                        setShowSimulatedGateway(false);
+                        setSimulatedPaymentDetails(null);
+                      }}
+                      className="flex-1 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-500 hover:bg-slate-50 transition-all cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSimulatedStatus('pending');
+                      }}
+                      className="flex-1 py-2 rounded-xl bg-blue-600 text-xs font-extrabold text-white hover:bg-blue-700 transition-all cursor-pointer"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                </div>
+              )}
+
+            </div>
+
+            {simulatedStatus === 'pending' && (
+              <div className="bg-slate-50 p-4 border-t border-slate-100 text-center flex justify-between items-center text-[10px] text-slate-400 font-medium">
+                <span>Securely powered by ApnaKhata</span>
+                <button 
+                  onClick={() => {
+                    setShowSimulatedGateway(false);
+                    setSimulatedPaymentDetails(null);
+                  }}
+                  className="font-bold text-slate-500 hover:text-slate-800 underline cursor-pointer"
+                >
+                  Cancel Checkout
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

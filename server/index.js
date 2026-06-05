@@ -656,6 +656,53 @@ app.post('/api/payments/verify', async (req, res) => {
   }
 });
 
+app.post('/api/payments/webhook', async (req, res) => {
+  try {
+    const signature = req.headers['x-razorpay-signature'];
+    const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
+
+    if (webhookSecret && signature) {
+      const shasum = crypto.createHmac('sha256', webhookSecret);
+      shasum.update(JSON.stringify(req.body));
+      const digest = shasum.digest('hex');
+      if (digest !== signature) {
+        return res.status(400).json({ error: 'Invalid webhook signature' });
+      }
+    }
+
+    const event = req.body.event;
+    if (event === 'order.paid') {
+      const order = req.body.payload.order.entity;
+      const shopId = order.notes?.shopId;
+      const orderAmount = Number(order.amount) / 100;
+
+      if (shopId) {
+        let months = 1;
+        if (orderAmount === 699) {
+          months = 3;
+        } else if (orderAmount === 2499) {
+          months = 12;
+        }
+
+        const next = new Date();
+        next.setMonth(next.getMonth() + months);
+        const renewalDate = next.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+
+        await pool.query(
+          `UPDATE shops SET subscription_status='active', renewal_date=?, plan_duration=?, plan_price=? WHERE id=?`,
+          [renewalDate, months, orderAmount, shopId]
+        );
+        console.log(`✅ Webhook: Successfully activated subscription for shop: ${shopId} (${months} months)`);
+      }
+    }
+
+    res.json({ status: 'ok' });
+  } catch (err) {
+    console.error('❌ Webhook error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── Start ────────────────────────────────────────────────────────────────────
 initDb()
   .then(() => {
