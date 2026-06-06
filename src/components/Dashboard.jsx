@@ -691,20 +691,35 @@ export default function Dashboard() {
   };
 
   // --- Stateful Transactions (Recent Bills) Ledger ---
-  // Invoice counter: persisted per merchant in localStorage for sequential numbering
-  const getInvoiceCounter = (prefix) => {
-    const stored = localStorage.getItem(`apna_khata_inv_counter_${prefix}`);
-    return stored ? parseInt(stored) : 1;
-  };
   const [invoiceCounter, setInvoiceCounter] = useState(1);
 
-  // Sync counter when merchant loads
+  // Sync counter when merchant loads or recentBills updates to dynamically calculate the next sequence number
   useEffect(() => {
     if (currentMerchant) {
-      const prefix = getStorePrefix(currentMerchant.shopName);
-      setInvoiceCounter(getInvoiceCounter(prefix));
+      const todayISO = new Date().toISOString().split('T')[0];
+      const todayBills = recentBills.filter(b => b.date === todayISO);
+      
+      let maxSeq = 0;
+      todayBills.forEach(b => {
+        const parts = b.id.split('-');
+        if (parts.length >= 3) {
+          // Format is PREFIX-YYYYMMDD-SEQ
+          const seq = parseInt(parts[parts.length - 1], 10);
+          if (!isNaN(seq) && seq > maxSeq) {
+            maxSeq = seq;
+          }
+        } else if (parts.length === 2) {
+          // Format is PREFIX-SEQ (legacy format)
+          const seq = parseInt(parts[1], 10);
+          if (!isNaN(seq) && seq > maxSeq) {
+            maxSeq = seq;
+          }
+        }
+      });
+      
+      setInvoiceCounter(maxSeq + 1);
     }
-  }, [currentMerchant]);
+  }, [currentMerchant, recentBills]);
 
   // Derive the active prefix (fallback to 'AK' before login)
   const activePrefix = currentMerchant ? getStorePrefix(currentMerchant.shopName) : 'AK';
@@ -896,7 +911,8 @@ export default function Dashboard() {
 
     const itemNamesList = billingCart.map(c => c.name).join(', ');
     const paddedNum = String(invoiceCounter).padStart(2, '0');
-    const newInvoiceId = `${activePrefix}-${paddedNum}`;
+    const todayDateStr = new Date().toISOString().split('T')[0].replace(/-/g, '');
+    const newInvoiceId = `${activePrefix}-${todayDateStr}-${paddedNum}`;
 
     const newBillItem = {
       id: newInvoiceId,
@@ -916,10 +932,6 @@ export default function Dashboard() {
       body: JSON.stringify(newBillItem)
     })
       .then(data => {
-        // Persist incremented counter for this store
-        localStorage.setItem(`apna_khata_inv_counter_${activePrefix}`, String(invoiceCounter + 1));
-        setInvoiceCounter(prev => prev + 1);
-
         // Update metrics returned by the server
         if (data.metrics) {
           setMetrics(data.metrics);

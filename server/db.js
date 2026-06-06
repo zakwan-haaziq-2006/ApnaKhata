@@ -185,12 +185,17 @@ export async function initDb() {
       `);
 
       // 3. Seed Bills for test_merchant
+      const seedDateStr = todayStr.replace(/-/g, '');
       await connection.query(`
         INSERT INTO bills (id, shop_id, time, date, items, total, amount, payment_method, discount, items_list) VALUES
-        ('KB-01', 'test_merchant', '10:15 AM', ?, 3, 108, 108, 'CASH', 0, 'Parle-G Biscuit, Tata Salt 1kg, Surf Excel 500g'),
-        ('KB-02', 'test_merchant', '12:30 PM', ?, 3, 135, 120, 'UPI', 15, 'Maggi Noodles, Colgate 150g, Fresh Potatoes (per Kg)'),
-        ('KB-03', 'test_merchant', '02:45 PM', ?, 2, 350, 350, 'CARD', 0, 'Aashirvaad Atta 5kg, Tata Tea 250g')
-      `, [todayStr, todayStr, todayStr]);
+        (?, 'test_merchant', '10:15 AM', ?, 3, 108, 108, 'CASH', 0, 'Parle-G Biscuit, Tata Salt 1kg, Surf Excel 500g'),
+        (?, 'test_merchant', '12:30 PM', ?, 3, 135, 120, 'UPI', 15, 'Maggi Noodles, Colgate 150g, Fresh Potatoes (per Kg)'),
+        (?, 'test_merchant', '02:45 PM', ?, 2, 350, 350, 'CARD', 0, 'Aashirvaad Atta 5kg, Tata Tea 250g')
+      `, [
+        `KB-${seedDateStr}-01`, todayStr,
+        `KB-${seedDateStr}-02`, todayStr,
+        `KB-${seedDateStr}-03`, todayStr
+      ]);
 
       // 4. Seed Expenses for test_merchant
       await connection.query(`
