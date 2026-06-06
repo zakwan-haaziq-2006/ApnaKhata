@@ -49,7 +49,7 @@ function shopRowToClient(row) {
     subscriptionStatus: row.subscription_status,
     renewalDate: row.renewal_date,
     planDuration: row.plan_duration !== undefined && row.plan_duration !== null ? Number(row.plan_duration) : 1,
-    planPrice: row.plan_price !== undefined && row.plan_price !== null ? Number(row.plan_price) : 249,
+    planPrice: row.plan_price !== undefined && row.plan_price !== null ? Number(row.plan_price) : 149,
     metrics: {
       sales: Number(row.sales),
       profit: Number(row.profit),
@@ -580,7 +580,7 @@ app.delete('/api/shops/:shopId/notifications/:notifId', async (req, res) => {
 // ─── PAYMENTS ─────────────────────────────────────────────────────────────────
 app.post('/api/payments/create-order', async (req, res) => {
   try {
-    const { shopId, amount = 249, month } = req.body;
+    const { shopId, amount = 149, month } = req.body;
     const { rows } = await pool.query('SELECT * FROM shops WHERE id = ?', [shopId]);
     if (rows.length === 0) return res.status(404).json({ error: 'Shop not found' });
 
@@ -614,7 +614,7 @@ app.post('/api/payments/verify', async (req, res) => {
   try {
     const { shopId, razorpay_order_id, razorpay_payment_id, razorpay_signature, amount } = req.body;
     
-    let orderAmount = Number(amount) || 249;
+    let orderAmount = Number(amount) || 149;
 
     const razorpay = getRazorpayClient();
     if (razorpay) {

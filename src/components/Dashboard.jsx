@@ -2158,7 +2158,7 @@ export default function Dashboard() {
                       </div>
                       <div className="mt-4">
                         <span className="text-2xl font-black text-blue-600 tracking-tight">
-                          ₹{storeRegistry.reduce((sum, s) => sum + (s.planPrice || 249), 0).toLocaleString('en-IN')}
+                          ₹{storeRegistry.reduce((sum, s) => sum + (s.planPrice || 149), 0).toLocaleString('en-IN')}
                         </span>
                         <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-md inline-block mt-1 w-max">
                           ₹{totalSimulatedRevenue} MRR
@@ -3362,6 +3362,143 @@ export default function Dashboard() {
                               <span className="text-[9px] font-bold text-amber-500">Products per invoice</span>
                             </div>
                           </div>
+                        </div>
+                      </section>
+
+                      {/* Financial Yield & Margin Card */}
+                      <section className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm space-y-4 animate-fadeIn">
+                        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                          <IndianRupee className="w-4 h-4 text-emerald-600" /> Operating Yield & Margin
+                        </h3>
+
+                        {(() => {
+                          const reportsCutoff = getRelativeDateUtil(reportsFilter === 'day' ? 0 : reportsFilter === 'week' ? 6 : 29);
+                          const periodBills = recentBills.filter(b => b.date >= reportsCutoff);
+                          const periodSales = periodBills.reduce((sum, b) => sum + (b.total || b.amount || 0), 0);
+                          const periodExpenses = getFilteredExpenses().reduce((sum, ex) => sum + (ex.amount || 0), 0);
+                          const periodNetYield = periodSales - periodExpenses;
+                          const marginPct = periodSales > 0 ? Math.round((periodNetYield / periodSales) * 100) : 0;
+
+                          return (
+                            <div className="space-y-4 text-xs font-semibold">
+                              <div className="grid grid-cols-3 gap-2 text-center">
+                                <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                                  <span className="text-[9px] text-slate-400 uppercase tracking-wider block">Gross Sales</span>
+                                  <span className="text-sm font-extrabold text-blue-600 block mt-1">₹{periodSales.toLocaleString('en-IN')}</span>
+                                </div>
+                                <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                                  <span className="text-[9px] text-slate-400 uppercase tracking-wider block">Expenses</span>
+                                  <span className="text-sm font-extrabold text-rose-600 block mt-1">₹{periodExpenses.toLocaleString('en-IN')}</span>
+                                </div>
+                                <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                                  <span className="text-[9px] text-slate-400 uppercase tracking-wider block">Net Yield</span>
+                                  <span className={`text-sm font-extrabold block mt-1 ${periodNetYield >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>₹{periodNetYield.toLocaleString('en-IN')}</span>
+                                </div>
+                              </div>
+
+                              <div className="space-y-1">
+                                <div className="flex justify-between items-center text-slate-500">
+                                  <span>Operating Profit Margin</span>
+                                  <span className={`font-extrabold ${periodNetYield >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{marginPct}%</span>
+                                </div>
+                                <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                                  <div className={`h-full rounded-full transition-all duration-300 ${periodNetYield >= 0 ? 'bg-emerald-500' : 'bg-rose-500'}`} style={{ width: `${Math.max(0, Math.min(100, marginPct))}%` }} />
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </section>
+
+                      {/* Payment Mode Share Analytics */}
+                      <section className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm space-y-4 animate-fadeIn">
+                        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                          <CreditCard className="w-4 h-4 text-blue-600" /> Payment Mode Share
+                        </h3>
+
+                        {(() => {
+                          const reportsCutoff = getRelativeDateUtil(reportsFilter === 'day' ? 0 : reportsFilter === 'week' ? 6 : 29);
+                          const periodBills = recentBills.filter(b => b.date >= reportsCutoff);
+                          const periodSales = periodBills.reduce((sum, b) => sum + (b.total || b.amount || 0), 0);
+
+                          const cashSales = periodBills.filter(b => b.paymentMethod === 'CASH').reduce((sum, b) => sum + (b.total || b.amount || 0), 0);
+                          const upiSales = periodBills.filter(b => b.paymentMethod === 'UPI').reduce((sum, b) => sum + (b.total || b.amount || 0), 0);
+                          const cardSales = periodBills.filter(b => b.paymentMethod === 'CARD').reduce((sum, b) => sum + (b.total || b.amount || 0), 0);
+
+                          const cashPct = periodSales > 0 ? Math.round((cashSales / periodSales) * 100) : 0;
+                          const upiPct = periodSales > 0 ? Math.round((upiSales / periodSales) * 100) : 0;
+                          const cardPct = periodSales > 0 ? Math.round((cardSales / periodSales) * 100) : 0;
+
+                          return (
+                            <div className="space-y-3.5 text-xs font-semibold">
+                              {/* Cash Share */}
+                              <div className="space-y-1">
+                                <div className="flex justify-between items-center text-slate-600">
+                                  <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-500" /> Cash (नकद)</span>
+                                  <span className="text-slate-400 font-bold">₹{cashSales.toLocaleString('en-IN')} ({cashPct}%)</span>
+                                </div>
+                                <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                  <div className="h-full bg-blue-500 rounded-full transition-all duration-300" style={{ width: `${cashPct}%` }} />
+                                </div>
+                              </div>
+
+                              {/* UPI Share */}
+                              <div className="space-y-1">
+                                <div className="flex justify-between items-center text-slate-600">
+                                  <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500" /> UPI</span>
+                                  <span className="text-slate-400 font-bold">₹{upiSales.toLocaleString('en-IN')} ({upiPct}%)</span>
+                                </div>
+                                <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                  <div className="h-full bg-emerald-500 rounded-full transition-all duration-300" style={{ width: `${upiPct}%` }} />
+                                </div>
+                              </div>
+
+                              {/* Card Share */}
+                              <div className="space-y-1">
+                                <div className="flex justify-between items-center text-slate-600">
+                                  <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-purple-500" /> Card (கார்டு)</span>
+                                  <span className="text-slate-400 font-bold">₹{cardSales.toLocaleString('en-IN')} ({cardPct}%)</span>
+                                </div>
+                                <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                  <div className="h-full bg-purple-500 rounded-full transition-all duration-300" style={{ width: `${cardPct}%` }} />
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </section>
+
+                      {/* Top 5 Products Table */}
+                      <section className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm space-y-4 animate-fadeIn">
+                        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                          <Award className="w-4 h-4 text-amber-500" /> Top 5 Selling Products
+                        </h3>
+
+                        <div className="space-y-2.5 divide-y divide-slate-100">
+                          {(() => {
+                            const topProductsList = getDrillDownProducts().slice(0, 5);
+                            if (topProductsList.length === 0) {
+                              return (
+                                <p className="text-xs text-slate-400 font-semibold py-4 text-center">
+                                  No product sales logged in this period.
+                                </p>
+                              );
+                            }
+                            return topProductsList.map((p, index) => (
+                              <div key={p.id} className="pt-2.5 first:pt-0 border-0 flex items-center justify-between text-xs font-semibold text-slate-800">
+                                <div className="flex items-center gap-2 max-w-[190px]">
+                                  <span className="w-5 h-5 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-[10px] font-black text-slate-500 shrink-0">
+                                    {index + 1}
+                                  </span>
+                                  <span className="truncate">{getProductDisplayName(p.name)}</span>
+                                </div>
+                                <div className="flex items-center gap-4.5">
+                                  <span className="text-[10px] text-slate-400 font-bold shrink-0">{p.units} units</span>
+                                  <span className="font-extrabold text-blue-600 w-12 text-right">₹{p.revenue}</span>
+                                </div>
+                              </div>
+                            ));
+                          })()}
                         </div>
                       </section>
                     </div>
