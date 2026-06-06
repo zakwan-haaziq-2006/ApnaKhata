@@ -209,6 +209,32 @@ const apiCall = async (url, options = {}) => {
 
 export default function Dashboard() {
   const { language, changeLanguage, t } = useLanguage();
+
+  const getProductDisplayName = (nameStr) => {
+    if (!nameStr) return '';
+    try {
+      const parsed = JSON.parse(nameStr);
+      if (parsed && typeof parsed === 'object') {
+        return parsed[language] || parsed['en'] || Object.values(parsed)[0] || '';
+      }
+    } catch (e) {
+      // Fail-safe for legacy names
+    }
+    return t(nameStr);
+  };
+
+  const parseItemsList = (itemsListStr) => {
+    if (!itemsListStr) return [];
+    try {
+      const parsed = JSON.parse(itemsListStr);
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
+    } catch (e) {
+      // Fail-safe for legacy comma-separated lists
+    }
+    return itemsListStr.split(',').map(s => s.trim()).filter(Boolean);
+  };
   const location = useLocation();
   const navigate = useNavigate();
   
@@ -548,7 +574,14 @@ export default function Dashboard() {
   const subcatColors = ['#2563eb', '#8b5cf6', '#10b981', '#f59e0b', '#ec4899', '#3b82f6', '#14b8a6'];
 
   function getCategoryForProduct(productName) {
-    const item = stockItems.find(s => s.name.toLowerCase() === productName.toLowerCase() || s.name.toLowerCase().includes(productName.toLowerCase()));
+    const item = stockItems.find(s => {
+      const sName = s.name.toLowerCase();
+      const pName = productName.toLowerCase();
+      if (sName === pName || sName.includes(pName)) return true;
+      const sDisplay = getProductDisplayName(s.name).toLowerCase();
+      const pDisplay = getProductDisplayName(productName).toLowerCase();
+      return sDisplay === pDisplay || sDisplay === pName || sName === pDisplay;
+    });
     if (item) return item.category;
     
     // Fallback to first subcategory of active shop category
@@ -564,7 +597,7 @@ export default function Dashboard() {
     
     billsList.forEach(b => {
       if (b.itemsList) {
-        const items = b.itemsList.split(',').map(s => s.trim()).filter(Boolean);
+        const items = parseItemsList(b.itemsList);
         const itemShare = Math.round((b.total || b.amount || 0) / Math.max(1, items.length));
         items.forEach(itemName => {
           const catName = getCategoryForProduct(itemName);
@@ -614,9 +647,16 @@ export default function Dashboard() {
     const productsMap = {};
     filterBills.forEach(b => {
       if (b.itemsList) {
-        const items = b.itemsList.split(',').map(s => s.trim()).filter(Boolean);
+        const items = parseItemsList(b.itemsList);
         items.forEach(itemName => {
-          const stockItem = stockItems.find(s => s.name.toLowerCase() === itemName.toLowerCase() || s.name.toLowerCase().includes(itemName.toLowerCase()));
+          const stockItem = stockItems.find(s => {
+            const sName = s.name.toLowerCase();
+            const pName = itemName.toLowerCase();
+            if (sName === pName || sName.includes(pName)) return true;
+            const sDisplay = getProductDisplayName(s.name).toLowerCase();
+            const pDisplay = getProductDisplayName(itemName).toLowerCase();
+            return sDisplay === pDisplay || sDisplay === pName || sName === pDisplay;
+          });
           const price = stockItem ? stockItem.price : 50;
           
           if (productsMap[itemName]) {
@@ -745,6 +785,8 @@ export default function Dashboard() {
   // --- Add Product Form States ---
   const [showAddProductModal, setShowAddProductModal] = useState(false);
   const [newStockName, setNewStockName] = useState('');
+  const [newStockNameTa, setNewStockNameTa] = useState('');
+  const [newStockNameUr, setNewStockNameUr] = useState('');
   const [newStockBuyingPrice, setNewStockBuyingPrice] = useState('');
   const [newStockSellingPrice, setNewStockSellingPrice] = useState('');
   const [newStockCategory, setNewStockCategory] = useState('Groceries');
@@ -850,8 +892,10 @@ export default function Dashboard() {
       b.time.toLowerCase().includes(q) ||
       (b.paymentMethod && (b.paymentMethod.toLowerCase().includes(q) || t(b.paymentMethod).toLowerCase().includes(q))) ||
       (b.itemsList && (
-        b.itemsList.toLowerCase().includes(q) ||
-        b.itemsList.split(',').map(s => s.trim()).some(itemName => t(itemName).toLowerCase().includes(q))
+        parseItemsList(b.itemsList).some(itemName => 
+          itemName.toLowerCase().includes(q) || 
+          getProductDisplayName(itemName).toLowerCase().includes(q)
+        )
       )) ||
       (b.total !== undefined && b.total.toString().includes(q))
     );
@@ -874,7 +918,7 @@ export default function Dashboard() {
       }
       return [...prev, { ...product, qty: 1 }];
     });
-    triggerToast(t('addedToCart', { name: t(product.name) }), 'success');
+    triggerToast(t('addedToCart', { name: getProductDisplayName(product.name) }), 'success');
   };
 
   const handleUpdateCartQty = (id, delta) => {
@@ -913,7 +957,7 @@ export default function Dashboard() {
     const discount = Number(offerAmount) || 0;
     const finalTotal = Math.max(0, originalTotal - discount);
 
-    const itemNamesList = billingCart.map(c => c.name).join(', ');
+    const itemNamesList = JSON.stringify(billingCart.map(c => c.name));
     const paddedNum = String(invoiceCounter).padStart(2, '0');
     const todayDateStr = new Date().toISOString().split('T')[0].replace(/-/g, '');
     const newInvoiceId = `${activePrefix}-${todayDateStr}-${paddedNum}`;
@@ -989,12 +1033,15 @@ export default function Dashboard() {
 
   const cartTotal = billingCart.reduce((sum, item) => sum + (item.price * item.qty), 0);
 
-  const filteredBillingProducts = availableBillingProducts.filter(p => 
-    p.name.toLowerCase().includes(billingSearch.toLowerCase()) ||
-    t(p.name).toLowerCase().includes(billingSearch.toLowerCase()) ||
-    (p.category || '').toLowerCase().includes(billingSearch.toLowerCase()) ||
-    t(p.category || '').toLowerCase().includes(billingSearch.toLowerCase())
-  );
+  const filteredBillingProducts = availableBillingProducts.filter(p => {
+    const displayName = getProductDisplayName(p.name).toLowerCase();
+    const rawName = p.name.toLowerCase();
+    const searchVal = billingSearch.toLowerCase();
+    return displayName.includes(searchVal) ||
+      rawName.includes(searchVal) ||
+      (p.category || '').toLowerCase().includes(searchVal) ||
+      t(p.category || '').toLowerCase().includes(searchVal);
+  });
 
   // --- Simulated Stock ---
   const [stockSearch, setStockSearch] = useState('');
@@ -1169,7 +1216,7 @@ export default function Dashboard() {
       .then(data => {
         setStockItems(prev => prev.map(item => item.id === refillItem.id ? data.item : item));
         const unitLabel = refillItem.isLoose ? 'Kg' : 'units';
-        triggerToast(t('addedUnitsTo', { qty: qtyToAdd, unit: unitLabel, name: t(refillItem.name) }), 'success');
+        triggerToast(t('addedUnitsTo', { qty: qtyToAdd, unit: unitLabel, name: getProductDisplayName(refillItem.name) }), 'success');
         setShowRefillModal(false);
         setRefillItem(null);
       })
@@ -1185,7 +1232,16 @@ export default function Dashboard() {
       return;
     }
 
-    const finalName = newStockName + (isSoldLoose ? " (per Kg)" : "");
+    const finalNameEn = newStockName + (isSoldLoose ? " (per Kg)" : "");
+    const finalNameTa = (newStockNameTa.trim() || newStockName) + (isSoldLoose ? " (ஒரு கிலோ)" : "");
+    const finalNameUr = (newStockNameUr.trim() || newStockName) + (isSoldLoose ? " (فی کلو)" : "");
+
+    const finalName = JSON.stringify({
+      en: finalNameEn,
+      ta: finalNameTa,
+      ur: finalNameUr
+    });
+
     const sellingPrice = parseInt(newStockSellingPrice) || 0;
     const buyingPrice = parseInt(newStockBuyingPrice) || 0;
     const openingStock = parseInt(newStockQty) || 50;
@@ -1205,10 +1261,12 @@ export default function Dashboard() {
     })
       .then(data => {
         setStockItems(prev => [...prev, data.item]);
-        triggerToast(t('successfullyAddedToInventory', { name: t(newStockName) }), 'success');
+        triggerToast(t('successfullyAddedToInventory', { name: getProductDisplayName(finalName) }), 'success');
 
         // Reset Form and close modal
         setNewStockName('');
+        setNewStockNameTa('');
+        setNewStockNameUr('');
         setNewStockBuyingPrice('');
         setNewStockSellingPrice('');
         setNewStockQty('50');
@@ -1220,12 +1278,15 @@ export default function Dashboard() {
       });
   };
 
-  const filteredStock = stockItems.filter(item =>
-    item.name.toLowerCase().includes(stockSearch.toLowerCase()) ||
-    t(item.name).toLowerCase().includes(stockSearch.toLowerCase()) ||
-    item.category.toLowerCase().includes(stockSearch.toLowerCase()) ||
-    t(item.category).toLowerCase().includes(stockSearch.toLowerCase())
-  );
+  const filteredStock = stockItems.filter(item => {
+    const displayName = getProductDisplayName(item.name).toLowerCase();
+    const rawName = item.name.toLowerCase();
+    const searchVal = stockSearch.toLowerCase();
+    return displayName.includes(searchVal) ||
+      rawName.includes(searchVal) ||
+      item.category.toLowerCase().includes(searchVal) ||
+      t(item.category).toLowerCase().includes(searchVal);
+  });
 
   // --- Authentication Actions ---
   const handleLoginMerchant = (e) => {
@@ -2760,7 +2821,7 @@ export default function Dashboard() {
                                   return (
                                     <div key={p.id} className="py-3 flex items-center justify-between text-sm first:pt-0 last:pb-0">
                                       <div className="flex flex-col space-y-0.5 max-w-[200px]">
-                                        <span className="font-extrabold text-slate-800 text-sm truncate">{t(p.name)}</span>
+                                        <span className="font-extrabold text-slate-800 text-sm truncate">{getProductDisplayName(p.name)}</span>
                                         <span className="text-xs text-slate-400 font-bold">
                                           {p.isLoose ? `₹${p.price}/Kg • Stock: ${p.stock} Kg` : `₹${p.price} each • Stock: ${p.stock}`}
                                         </span>
@@ -2775,7 +2836,7 @@ export default function Dashboard() {
                                         <button 
                                           onClick={() => handleAddToCart(p)}
                                           className="min-h-[44px] min-w-[44px] rounded-xl bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center active:scale-95 transition-all shadow-sm shadow-blue-500/10 cursor-pointer"
-                                          aria-label={`Add ${t(p.name)} to cart`}
+                                          aria-label={`Add ${getProductDisplayName(p.name)} to cart`}
                                         >
                                           <Plus className="w-5 h-5 stroke-[3]" />
                                         </button>
@@ -2848,7 +2909,7 @@ export default function Dashboard() {
                                 {billingCart.map(item => (
                                   <div key={item.id} className="py-2.5 flex items-center justify-between first:pt-0 last:pb-0">
                                     <div className="flex flex-col space-y-0.5">
-                                      <span className="text-xs font-extrabold text-slate-800">{t(item.name)}</span>
+                                      <span className="text-xs font-extrabold text-slate-800">{getProductDisplayName(item.name)}</span>
                                       <span className="text-[10px] text-slate-400 font-bold">
                                         {item.isLoose ? `₹${item.price}/Kg` : `₹${item.price} each`}
                                       </span>
@@ -3013,7 +3074,7 @@ export default function Dashboard() {
                             <div key={item.id} className="bg-white p-3.5 rounded-2xl border border-slate-100 flex items-center justify-between">
                               <div className="flex flex-col">
                                 <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{t(item.category)}</span>
-                                <span className="text-sm font-bold text-slate-800 mt-1">{t(item.name)}</span>
+                                <span className="text-sm font-bold text-slate-800 mt-1">{getProductDisplayName(item.name)}</span>
                                 <div className="flex items-center gap-2.5 mt-1.5">
                                   <span className="text-xs font-semibold text-slate-500">
                                     {item.isLoose ? `₹${item.price}/Kg` : `₹${item.price} ${t('each')}`}
@@ -3233,7 +3294,7 @@ export default function Dashboard() {
                                     <span className="w-4.5 h-4.5 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-[9px] font-bold text-slate-500">
                                       {idx + 1}
                                     </span>
-                                    <span className="font-bold text-slate-800">{t(p.name)}</span>
+                                    <span className="font-bold text-slate-800">{getProductDisplayName(p.name)}</span>
                                   </div>
                                   <div className="flex items-center gap-3">
                                     <span className="text-[10px] text-slate-400 font-semibold">{p.units} sold</span>
@@ -3312,6 +3373,8 @@ export default function Dashboard() {
                   <button 
                     onClick={() => {
                       setNewStockName('');
+                      setNewStockNameTa('');
+                      setNewStockNameUr('');
                       setNewStockBuyingPrice('');
                       setNewStockSellingPrice('');
                       setNewStockQty('50');
@@ -3381,9 +3444,12 @@ export default function Dashboard() {
                 {/* Form fields */}
                 <form onSubmit={handleCreateProduct} className="space-y-4">
                   
-                  {/* Product Name */}
+                  {/* Product Name (English) */}
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block pl-0.5">{t('productName')}</label>
+                    <div className="flex items-center gap-1.5 pl-0.5">
+                      <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block">{t('productName')}</label>
+                      <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-600 border border-blue-100/50">EN</span>
+                    </div>
                     <input 
                       type="text" 
                       required
@@ -3391,6 +3457,37 @@ export default function Dashboard() {
                       onChange={(e) => setNewStockName(e.target.value)}
                       placeholder={t('productNamePlaceholder')}
                       className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-100 text-sm focus:outline-none focus:border-blue-500 text-slate-800 font-semibold placeholder-slate-400 shadow-inner"
+                    />
+                  </div>
+
+                  {/* Product Name (Tamil) */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-1.5 pl-0.5">
+                      <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block">{t('productName')}</label>
+                      <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-600 border border-emerald-100/50">TA</span>
+                    </div>
+                    <input 
+                      type="text" 
+                      value={newStockNameTa}
+                      onChange={(e) => setNewStockNameTa(e.target.value)}
+                      placeholder="எ.கா: உருளைக்கிழங்கு, ஆப்பிள்..."
+                      className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-100 text-sm focus:outline-none focus:border-blue-500 text-slate-800 font-semibold placeholder-slate-400 shadow-inner"
+                    />
+                  </div>
+
+                  {/* Product Name (Urdu) */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-1.5 pl-0.5">
+                      <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block">{t('productName')}</label>
+                      <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-md bg-purple-50 text-purple-600 border border-purple-100/50">UR</span>
+                    </div>
+                    <input 
+                      type="text" 
+                      value={newStockNameUr}
+                      onChange={(e) => setNewStockNameUr(e.target.value)}
+                      placeholder="مثلاً: آلو، سیب..."
+                      dir="rtl"
+                      className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-100 text-sm focus:outline-none focus:border-blue-500 text-slate-800 font-semibold placeholder-slate-400 shadow-inner text-right"
                     />
                   </div>
 
@@ -3508,7 +3605,7 @@ export default function Dashboard() {
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                   <div className="flex flex-col">
                     <span className="text-[10px] font-extrabold text-blue-600 uppercase tracking-widest leading-none">{t('refillStock')}</span>
-                    <h3 className="text-base font-black text-slate-800 mt-1.5 leading-none">{t(refillItem.name)}</h3>
+                    <h3 className="text-base font-black text-slate-800 mt-1.5 leading-none">{getProductDisplayName(refillItem.name)}</h3>
                   </div>
                   <button 
                     onClick={() => {
