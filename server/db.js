@@ -165,9 +165,9 @@ export async function initDb() {
       // 1. Seed Shops
       await connection.query(`
         INSERT INTO shops (id, username, password, shop_name, owner_name, category, subscription_status, renewal_date, plan_duration, plan_price, sales, profit, expenses, items_sold, customers_visited) VALUES
-        ('test_merchant', 'test', ?, 'Kirana Bazaar', 'Rajesh Kumar', 'Grocery', 'active', DATE_FORMAT(DATE_ADD(NOW(), INTERVAL 30 DAY), '%Y-%m-%d'), 12, 1999, 14500, 4200, 2300, 320, 85),
-        ('shop_bata', 'bata', ?, 'Bata Footwear', 'Anil Sharma', 'Clothing', 'active', DATE_FORMAT(DATE_ADD(NOW(), INTERVAL 60 DAY), '%Y-%m-%d'), 6, 1199, 28000, 9500, 4500, 140, 210),
-        ('shop_care', 'care', ?, 'Care Pharmacy', 'Dr. Sunita Patel', 'Pharmacy', 'expired', 'Expired', 1, 249, 42000, 12500, 6800, 980, 450)
+        ('test_merchant', 'test', ?, 'Kirana Bazaar', 'Rajesh Kumar', 'Grocery', 'active', DATE_FORMAT(DATE_ADD(NOW(), INTERVAL 30 DAY), '%Y-%m-%d'), 12, 1599, 14500, 4200, 2300, 320, 85),
+        ('shop_bata', 'bata', ?, 'Bata Footwear', 'Anil Sharma', 'Clothing', 'active', DATE_FORMAT(DATE_ADD(NOW(), INTERVAL 60 DAY), '%Y-%m-%d'), 6, 799, 28000, 9500, 4500, 140, 210),
+        ('shop_care', 'care', ?, 'Care Pharmacy', 'Dr. Sunita Patel', 'Pharmacy', 'expired', 'Expired', 1, 149, 42000, 12500, 6800, 980, 450)
       `, [hashedTestPassword, hashedPassword, hashedPassword]);
 
       // 2. Seed Stock Items for test_merchant

@@ -182,9 +182,10 @@ app.post('/api/shops', async (req, res) => {
     if (existing.rowCount > 0) return res.status(409).json({ error: 'Username already exists' });
 
     const durInt = parseInt(duration) || 1;
-    let planPrice = 249;
-    if (durInt === 3) planPrice = 699;
-    else if (durInt === 12) planPrice = 2499;
+    let planPrice = 149;
+    if (durInt === 3) planPrice = 399;
+    else if (durInt === 6) planPrice = 799;
+    else if (durInt === 12) planPrice = 1599;
 
     const renewalDate = new Date(Date.now() + durInt * 30 * 24 * 60 * 60 * 1000)
       .toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -223,9 +224,10 @@ app.patch('/api/shops/:shopId/subscription', async (req, res) => {
       }
       if (duration !== undefined) {
         nextDuration = parseInt(duration) || 1;
-        if (nextDuration === 3) nextPrice = 699;
-        else if (nextDuration === 12) nextPrice = 2499;
-        else nextPrice = 249;
+        if (nextDuration === 3) nextPrice = 399;
+        else if (nextDuration === 6) nextPrice = 799;
+        else if (nextDuration === 12) nextPrice = 1599;
+        else nextPrice = 149;
       }
       if (renewalDate !== undefined) {
         nextDate = renewalDate;
@@ -634,9 +636,11 @@ app.post('/api/payments/verify', async (req, res) => {
     }
 
     let months = 1;
-    if (orderAmount === 699) {
+    if (orderAmount === 399) {
       months = 3;
-    } else if (orderAmount === 2499) {
+    } else if (orderAmount === 799) {
+      months = 6;
+    } else if (orderAmount === 1599) {
       months = 12;
     }
 
@@ -687,9 +691,11 @@ app.post('/api/payments/webhook', async (req, res) => {
 
       if (shopId) {
         let months = 1;
-        if (orderAmount === 699) {
+        if (orderAmount === 399) {
           months = 3;
-        } else if (orderAmount === 2499) {
+        } else if (orderAmount === 799) {
+          months = 6;
+        } else if (orderAmount === 1599) {
           months = 12;
         }
 

@@ -1576,9 +1576,10 @@ export default function Dashboard() {
   const adminActiveCount = storeRegistry.filter(s => s.subscriptionStatus === 'active').length;
   const adminLapsedCount = storeRegistry.length - adminActiveCount;
   const totalSimulatedRevenue = storeRegistry.filter(s => s.subscriptionStatus === 'active').reduce((sum, s) => {
-    if (s.planDuration === 3) return sum + 233; // ~699/3
-    if (s.planDuration === 12) return sum + 208; // ~2499/12
-    return sum + 249;
+    if (s.planDuration === 3) return sum + 133; // ~399/3
+    if (s.planDuration === 6) return sum + 133; // ~799/6
+    if (s.planDuration === 12) return sum + 133; // ~1599/12
+    return sum + 149;
   }, 0);
 
   return (
@@ -1893,9 +1894,10 @@ export default function Dashboard() {
                                 className="bg-slate-50 border border-slate-100 text-[10px] text-blue-600 font-extrabold rounded-lg px-2 py-1.5 focus:outline-none cursor-pointer max-w-[110px]"
                                 aria-label="Select Pricing Plan"
                               >
-                                <option value="1">1 Mo (₹249)</option>
-                                <option value="3">3 Mo (₹699)</option>
-                                <option value="12">1 Yr (₹2499)</option>
+                                <option value="1">1 Mo (₹149)</option>
+                                <option value="3">3 Mo (₹399)</option>
+                                <option value="6">6 Mo (₹799)</option>
+                                <option value="12">1 Yr (₹1599)</option>
                                 <option value="expired">Expired</option>
                               </select>
                             </div>
@@ -1958,9 +1960,10 @@ export default function Dashboard() {
                             onChange={(e) => setNewDuration(e.target.value)}
                             className="flex-1 bg-transparent text-[11px] text-blue-600 font-bold focus:outline-none cursor-pointer"
                           >
-                            <option value="1">1 Month (₹249)</option>
-                            <option value="3">3 Months (₹699)</option>
-                            <option value="12">1 Year (₹2499)</option>
+                            <option value="1">1 Month (₹149)</option>
+                            <option value="3">3 Months (₹399)</option>
+                            <option value="6">6 Months (₹799)</option>
+                            <option value="12">1 Year (₹1599)</option>
                           </select>
                         </div>
 
@@ -2113,11 +2116,13 @@ export default function Dashboard() {
                       {(() => {
                         const p1m = storeRegistry.filter(s => (s.planDuration || 1) === 1).length;
                         const p3m = storeRegistry.filter(s => s.planDuration === 3).length;
+                        const p6m = storeRegistry.filter(s => s.planDuration === 6).length;
                         const p1y = storeRegistry.filter(s => s.planDuration === 12).length;
                         const total = storeRegistry.length;
 
                         const pct1m = total > 0 ? Math.round((p1m / total) * 100) : 0;
                         const pct3m = total > 0 ? Math.round((p3m / total) * 100) : 0;
+                        const pct6m = total > 0 ? Math.round((p6m / total) * 100) : 0;
                         const pct1y = total > 0 ? Math.round((p1y / total) * 100) : 0;
 
                         return (
@@ -2125,8 +2130,8 @@ export default function Dashboard() {
                             {/* 1 Month Plan */}
                             <div className="space-y-1.5 text-xs">
                               <div className="flex justify-between items-center text-slate-600 font-semibold">
-                                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500" /> 1 Month (₹249)</span>
-                                <span className="text-slate-400 font-bold">{p1m} users ({pct1m})</span>
+                                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500" /> 1 Month (₹149)</span>
+                                <span className="text-slate-400 font-bold">{p1m} users ({pct1m}%)</span>
                               </div>
                               <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
                                 <div className="h-full bg-blue-500 rounded-full" style={{ width: `${pct1m}%` }} />
@@ -2136,7 +2141,7 @@ export default function Dashboard() {
                             {/* 3 Month Plan */}
                             <div className="space-y-1.5 text-xs">
                               <div className="flex justify-between items-center text-slate-600 font-semibold">
-                                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" /> 3 Months (₹699)</span>
+                                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" /> 3 Months (₹399)</span>
                                 <span className="text-slate-400 font-bold">{p3m} users ({pct3m}%)</span>
                               </div>
                               <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
@@ -2144,10 +2149,21 @@ export default function Dashboard() {
                               </div>
                             </div>
 
+                            {/* 6 Month Plan */}
+                            <div className="space-y-1.5 text-xs">
+                              <div className="flex justify-between items-center text-slate-600 font-semibold">
+                                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-orange-500" /> 6 Months (₹799)</span>
+                                <span className="text-slate-400 font-bold">{p6m} users ({pct6m}%)</span>
+                              </div>
+                              <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                                <div className="h-full bg-orange-500 rounded-full" style={{ width: `${pct6m}%` }} />
+                              </div>
+                            </div>
+
                             {/* 1 Year Plan */}
                             <div className="space-y-1.5 text-xs">
                               <div className="flex justify-between items-center text-slate-600 font-semibold">
-                                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-purple-500" /> 1 Year (₹2499)</span>
+                                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-purple-500" /> 1 Year (₹1599)</span>
                                 <span className="text-slate-400 font-bold">{p1y} users ({pct1y}%)</span>
                               </div>
                               <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
@@ -2240,7 +2256,7 @@ export default function Dashboard() {
 
                   <div className="space-y-3">
                     <button
-                      onClick={() => handleRenewSubscription(1, 249)}
+                      onClick={() => handleRenewSubscription(1, 149)}
                       className="w-full text-left p-4 rounded-2xl border-2 border-slate-100 hover:border-blue-500 hover:bg-blue-50/10 flex justify-between items-center transition-all group"
                     >
                       <div className="space-y-1">
@@ -2248,13 +2264,13 @@ export default function Dashboard() {
                         <span className="text-[10px] text-slate-400 block font-medium">Standard monthly plan</span>
                       </div>
                       <div className="text-right">
-                        <span className="text-sm font-black text-blue-600">₹249</span>
+                        <span className="text-sm font-black text-blue-600">₹149</span>
                         <span className="text-[9px] text-slate-400 block font-bold uppercase tracking-wider mt-0.5">/ Month</span>
                       </div>
                     </button>
 
                     <button
-                      onClick={() => handleRenewSubscription(3, 699)}
+                      onClick={() => handleRenewSubscription(3, 399)}
                       className="w-full text-left p-4 rounded-2xl border-2 border-blue-100 bg-blue-50/5 hover:border-blue-500 hover:bg-blue-50/20 flex justify-between items-center transition-all relative group"
                     >
                       <span className="absolute -top-2.5 right-4 px-2 py-0.5 rounded-full bg-emerald-500 text-white text-[8px] font-black uppercase tracking-wider">Popular</span>
@@ -2263,21 +2279,35 @@ export default function Dashboard() {
                         <span className="text-[10px] text-slate-400 block font-medium">Quarterly bundle - Save ₹48</span>
                       </div>
                       <div className="text-right">
-                        <span className="text-sm font-black text-blue-600">₹699</span>
+                        <span className="text-sm font-black text-blue-600">₹399</span>
                         <span className="text-[9px] text-slate-400 block font-bold uppercase tracking-wider mt-0.5">/ 3 Mos</span>
                       </div>
                     </button>
 
                     <button
-                      onClick={() => handleRenewSubscription(12, 2499)}
+                      onClick={() => handleRenewSubscription(6, 799)}
+                      className="w-full text-left p-4 rounded-2xl border-2 border-slate-100 hover:border-blue-500 hover:bg-blue-50/10 flex justify-between items-center transition-all group"
+                    >
+                      <div className="space-y-1">
+                        <span className="text-xs font-bold text-slate-800">6 Months Saver</span>
+                        <span className="text-[10px] text-slate-400 block font-medium">Half-Yearly bundle - Save ₹95</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-sm font-black text-blue-600">₹799</span>
+                        <span className="text-[9px] text-slate-400 block font-bold uppercase tracking-wider mt-0.5">/ 6 Mos</span>
+                      </div>
+                    </button>
+
+                    <button
+                      onClick={() => handleRenewSubscription(12, 1599)}
                       className="w-full text-left p-4 rounded-2xl border-2 border-slate-100 hover:border-blue-500 hover:bg-blue-50/10 flex justify-between items-center transition-all group"
                     >
                       <div className="space-y-1">
                         <span className="text-xs font-bold text-slate-800">1 Year Value</span>
-                        <span className="text-[10px] text-slate-400 block font-medium">Best savings - Save ₹489</span>
+                        <span className="text-[10px] text-slate-400 block font-medium">Best savings - Save ₹189</span>
                       </div>
                       <div className="text-right">
-                        <span className="text-sm font-black text-blue-600">₹2499</span>
+                        <span className="text-sm font-black text-blue-600">₹1599</span>
                         <span className="text-[9px] text-slate-400 block font-bold uppercase tracking-wider mt-0.5">/ Year</span>
                       </div>
                     </button>
@@ -3968,7 +3998,7 @@ export default function Dashboard() {
               </div>
             )}
 
-            <div className="grid grid-cols-1 gap-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
               {/* Plan 1 */}
               <div className="bg-white border border-slate-100 shadow-lg rounded-3xl p-6 flex flex-col justify-between space-y-6">
                 <div className="space-y-4">
@@ -3977,7 +4007,7 @@ export default function Dashboard() {
                     <p className="text-xs text-slate-400 font-medium mt-1">Standard subscription plan</p>
                   </div>
                   <div className="pt-2">
-                    <span className="text-3xl font-black text-blue-600">₹249</span>
+                    <span className="text-3xl font-black text-blue-600">₹149</span>
                     <span className="text-xs text-slate-400 font-bold uppercase pl-1">/ month</span>
                   </div>
                   <ul className="space-y-2.5 text-xs text-slate-500 font-semibold pt-4 border-t border-slate-50">
@@ -3988,7 +4018,7 @@ export default function Dashboard() {
                   </ul>
                 </div>
                 <button
-                  onClick={() => handleRenewSubscription(1, 249)}
+                  onClick={() => handleRenewSubscription(1, 149)}
                   className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs active:scale-98 transition-all cursor-pointer shadow-md shadow-blue-500/10"
                 >
                   {currentMerchant ? 'Extend Subscription' : 'Sign In to Purchase'}
@@ -4004,7 +4034,7 @@ export default function Dashboard() {
                     <p className="text-xs text-slate-400 font-medium mt-1">Quarterly bundle license</p>
                   </div>
                   <div className="pt-2">
-                    <span className="text-3xl font-black text-blue-600">₹699</span>
+                    <span className="text-3xl font-black text-blue-600">₹399</span>
                     <span className="text-xs text-slate-400 font-bold uppercase pl-1">/ 3 mos</span>
                   </div>
                   <ul className="space-y-2.5 text-xs text-slate-500 font-semibold pt-4 border-t border-slate-50">
@@ -4015,7 +4045,7 @@ export default function Dashboard() {
                   </ul>
                 </div>
                 <button
-                  onClick={() => handleRenewSubscription(3, 699)}
+                  onClick={() => handleRenewSubscription(3, 399)}
                   className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs active:scale-98 transition-all cursor-pointer shadow-md shadow-blue-500/10"
                 >
                   {currentMerchant ? 'Extend Subscription' : 'Sign In to Purchase'}
@@ -4026,22 +4056,48 @@ export default function Dashboard() {
               <div className="bg-white border border-slate-100 shadow-lg rounded-3xl p-6 flex flex-col justify-between space-y-6">
                 <div className="space-y-4">
                   <div>
-                    <h3 className="text-lg font-bold text-slate-800">1 Year Value</h3>
-                    <p className="text-xs text-slate-400 font-medium mt-1">Annual license value pack</p>
+                    <h3 className="text-lg font-bold text-slate-800">6 Months Saver</h3>
+                    <p className="text-xs text-slate-400 font-medium mt-1">Half-Yearly bundle license</p>
                   </div>
                   <div className="pt-2">
-                    <span className="text-3xl font-black text-blue-600">₹2499</span>
-                    <span className="text-xs text-slate-400 font-bold uppercase pl-1">/ year</span>
+                    <span className="text-3xl font-black text-blue-600">₹799</span>
+                    <span className="text-xs text-slate-400 font-bold uppercase pl-1">/ 6 mos</span>
                   </div>
                   <ul className="space-y-2.5 text-xs text-slate-500 font-semibold pt-4 border-t border-slate-50">
                     <li className="flex items-center gap-2">✔ All Quarterly Features</li>
-                    <li className="flex items-center gap-2 text-emerald-600">✔ Save ₹489 overall</li>
+                    <li className="flex items-center gap-2 text-emerald-600">✔ Save ₹95 overall</li>
                     <li className="flex items-center gap-2">✔ Priority Provisioning</li>
                     <li className="flex items-center gap-2">✔ Offline Backup Support</li>
                   </ul>
                 </div>
                 <button
-                  onClick={() => handleRenewSubscription(12, 2499)}
+                  onClick={() => handleRenewSubscription(6, 799)}
+                  className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs active:scale-98 transition-all cursor-pointer shadow-md shadow-blue-500/10"
+                >
+                  {currentMerchant ? 'Extend Subscription' : 'Sign In to Purchase'}
+                </button>
+              </div>
+
+              {/* Plan 4 */}
+              <div className="bg-white border border-slate-100 shadow-lg rounded-3xl p-6 flex flex-col justify-between space-y-6">
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-800">1 Year Value</h3>
+                    <p className="text-xs text-slate-400 font-medium mt-1">Annual license value pack</p>
+                  </div>
+                  <div className="pt-2">
+                    <span className="text-3xl font-black text-blue-600">₹1599</span>
+                    <span className="text-xs text-slate-400 font-bold uppercase pl-1">/ year</span>
+                  </div>
+                  <ul className="space-y-2.5 text-xs text-slate-500 font-semibold pt-4 border-t border-slate-50">
+                    <li className="flex items-center gap-2">✔ All Half-Yearly Features</li>
+                    <li className="flex items-center gap-2 text-emerald-600">✔ Save ₹189 overall</li>
+                    <li className="flex items-center gap-2">✔ Dedicated Success Manager</li>
+                    <li className="flex items-center gap-2">✔ Custom Feature Requests</li>
+                  </ul>
+                </div>
+                <button
+                  onClick={() => handleRenewSubscription(12, 1599)}
                   className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs active:scale-98 transition-all cursor-pointer shadow-md shadow-blue-500/10"
                 >
                   {currentMerchant ? 'Extend Subscription' : 'Sign In to Purchase'}
