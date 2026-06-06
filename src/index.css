@@ -94,3 +94,79 @@ button, select, input {
 button:active:not(:disabled) {
   transform: scale(0.96);
 }
+
+/* Google Pay-like Success Screen Animations */
+@keyframes scaleUpBounce {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes ripplePulse {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+@keyframes drawCheckmark {
+  0% {
+    stroke-dashoffset: 80;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes textSlideUp {
+  0% {
+    transform: translateY(30px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-success-circle {
+  animation: scaleUpBounce 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.animate-ripple-1 {
+  animation: ripplePulse 1.8s cubic-bezier(0.1, 0.8, 0.3, 1) infinite;
+  animation-delay: 0s;
+}
+
+.animate-ripple-2 {
+  animation: ripplePulse 1.8s cubic-bezier(0.1, 0.8, 0.3, 1) infinite;
+  animation-delay: 0.6s;
+}
+
+.animate-ripple-3 {
+  animation: ripplePulse 1.8s cubic-bezier(0.1, 0.8, 0.3, 1) infinite;
+  animation-delay: 1.2s;
+}
+
+.animate-checkmark-draw {
+  stroke-dasharray: 80;
+  stroke-dashoffset: 80;
+  animation: drawCheckmark 0.5s cubic-bezier(0.4, 0, 0.2, 1) 0.5s forwards;
+}
+
+.animate-text-slide {
+  animation: textSlideUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.3s forwards;
+  opacity: 0;
+}

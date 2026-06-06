@@ -234,6 +234,10 @@ export default function Dashboard() {
   const [simulatedPaymentDetails, setSimulatedPaymentDetails] = useState(null); // { shopId, shopName, months, amount, orderId }
   const [isSimulatingPayment, setIsSimulatingPayment] = useState(false);
   const [simulatedStatus, setSimulatedStatus] = useState('pending'); // 'pending', 'processing', 'success', 'failed'
+  
+  // --- Google Pay Style Success Screen State ---
+  const [showPaymentSuccessScreen, setShowPaymentSuccessScreen] = useState(false);
+  const [successScreenAmount, setSuccessScreenAmount] = useState(0);
 
   // --- General View & Form States ---
   const [activeTab, setActiveTab] = useState('home'); 
@@ -1422,6 +1426,14 @@ export default function Dashboard() {
       });
   };
 
+  const triggerPaymentSuccessScreen = (amount) => {
+    setSuccessScreenAmount(amount);
+    setShowPaymentSuccessScreen(true);
+    setTimeout(() => {
+      setShowPaymentSuccessScreen(false);
+    }, 4500); // 4.5s GPay success screen duration
+  };
+
   const handleConfirmSimulatedPayment = async () => {
     if (!simulatedPaymentDetails) return;
     setIsSimulatingPayment(true);
@@ -1440,7 +1452,6 @@ export default function Dashboard() {
         if (verifyData.success) {
           setSimulatedStatus('success');
           setTimeout(() => {
-            triggerToast('Payment successful! Subscription activated.', 'success');
             setShowSimulatedGateway(false);
             setSimulatedPaymentDetails(null);
             setPendingPaymentShopId(null);
@@ -1455,6 +1466,7 @@ export default function Dashboard() {
               setSessionUser(shop.id);
               setSessionRole('merchant');
             }
+            triggerPaymentSuccessScreen(simulatedPaymentDetails.amount);
             navigate('/');
           }, 1000);
         }
@@ -1529,7 +1541,6 @@ export default function Dashboard() {
             });
 
             if (verifyData.success) {
-              triggerToast('Payment successful! Subscription activated.', 'success');
               setPendingPaymentShopId(null);
               const shop = verifyData.shop;
               if (currentMerchant) {
@@ -1541,6 +1552,7 @@ export default function Dashboard() {
                 setSessionUser(shop.id);
                 setSessionRole('merchant');
               }
+              triggerPaymentSuccessScreen(amount);
             }
           } catch (verifyErr) {
             triggerToast(verifyErr.message || 'Payment verification failed!', 'error');
@@ -4284,6 +4296,47 @@ export default function Dashboard() {
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Google Pay Style Success Screen Overlay */}
+      {showPaymentSuccessScreen && (
+        <div className="fixed inset-0 z-[9999] bg-[#0f9d58] flex flex-col items-center justify-center text-white animate-fade-in select-none">
+          {/* Pulsing Concentric Ripple Rings */}
+          <div className="absolute w-72 h-72 rounded-full border-4 border-white/5 bg-white/5 flex items-center justify-center animate-ripple-3"></div>
+          <div className="absolute w-72 h-72 rounded-full border-4 border-white/10 bg-white/5 flex items-center justify-center animate-ripple-2"></div>
+          <div className="absolute w-72 h-72 rounded-full border-4 border-white/20 bg-white/5 flex items-center justify-center animate-ripple-1"></div>
+          
+          {/* Main Success Circle */}
+          <div className="relative w-32 h-32 rounded-full bg-white flex items-center justify-center shadow-2xl animate-success-circle z-10">
+            <svg 
+              className="w-16 h-16 text-[#0f9d58]" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="5" 
+              viewBox="0 0 24 24"
+            >
+              <path 
+                className="animate-checkmark-draw"
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                d="M5 13l4 4L19 7" 
+              />
+            </svg>
+          </div>
+          
+          {/* Success Payment Information */}
+          <div className="mt-12 text-center animate-text-slide space-y-3 z-10 px-6 max-w-md">
+            <h2 className="text-4xl font-black tracking-tight">₹{successScreenAmount.toLocaleString('en-IN')}.00</h2>
+            <div className="space-y-1">
+              <p className="text-lg font-extrabold text-white/95">Subscription Active</p>
+              <p className="text-xs font-bold text-emerald-100 uppercase tracking-widest">Paid Successfully to ApnaKhata Premium</p>
+            </div>
+            
+            <div className="pt-8 text-center text-[10px] font-bold text-white/60 uppercase tracking-wider">
+              Transaction Secured via Razorpay
+            </div>
           </div>
         </div>
       )}
