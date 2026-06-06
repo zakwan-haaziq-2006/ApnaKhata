@@ -640,16 +640,25 @@ app.post('/api/payments/verify', async (req, res) => {
       months = 12;
     }
 
-    const next = new Date();
-    next.setMonth(next.getMonth() + months);
-    const renewalDate = next.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+    const { rows: shopRows } = await pool.query('SELECT subscription_status, renewal_date FROM shops WHERE id=?', [shopId]);
+    if (shopRows.length === 0) return res.status(404).json({ error: 'Shop not found' });
+    const shop = shopRows[0];
+
+    let startDate = new Date();
+    if (shop.subscription_status === 'active' && shop.renewal_date) {
+      const currentRenewal = new Date(shop.renewal_date);
+      if (!isNaN(currentRenewal.getTime()) && currentRenewal > startDate) {
+        startDate = currentRenewal;
+      }
+    }
+    startDate.setMonth(startDate.getMonth() + months);
+    const renewalDate = startDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
 
     await pool.query(
       `UPDATE shops SET subscription_status='active', renewal_date=?, plan_duration=?, plan_price=? WHERE id=?`,
       [renewalDate, months, orderAmount, shopId]
     );
     const { rows } = await pool.query('SELECT * FROM shops WHERE id=?', [shopId]);
-    if (rows.length === 0) return res.status(404).json({ error: 'Shop not found' });
     res.json({ success: true, shop: shopRowToClient(rows[0]) });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -684,9 +693,19 @@ app.post('/api/payments/webhook', async (req, res) => {
           months = 12;
         }
 
-        const next = new Date();
-        next.setMonth(next.getMonth() + months);
-        const renewalDate = next.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+        const { rows: shopRows } = await pool.query('SELECT subscription_status, renewal_date FROM shops WHERE id=?', [shopId]);
+        let startDate = new Date();
+        if (shopRows.length > 0) {
+          const shop = shopRows[0];
+          if (shop.subscription_status === 'active' && shop.renewal_date) {
+            const currentRenewal = new Date(shop.renewal_date);
+            if (!isNaN(currentRenewal.getTime()) && currentRenewal > startDate) {
+              startDate = currentRenewal;
+            }
+          }
+        }
+        startDate.setMonth(startDate.getMonth() + months);
+        const renewalDate = startDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
 
         await pool.query(
           `UPDATE shops SET subscription_status='active', renewal_date=?, plan_duration=?, plan_price=? WHERE id=?`,
