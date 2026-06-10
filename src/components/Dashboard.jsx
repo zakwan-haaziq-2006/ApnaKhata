@@ -3504,6 +3504,176 @@ export default function Dashboard() {
                         })()}
                       </section>
 
+                      {/* Peak Hours Analysis */}
+                      <section className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm space-y-4 animate-fadeIn">
+                        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                          <Clock className="w-4 h-4 text-purple-600" /> Busy Hours & Peak Sales
+                        </h3>
+
+                        {(() => {
+                          const reportsCutoff = getRelativeDateUtil(reportsFilter === 'day' ? 0 : reportsFilter === 'week' ? 6 : 29);
+                          const periodBills = recentBills.filter(b => b.date >= reportsCutoff);
+                          
+                          // Group into slots
+                          const slots = {
+                            'Morning (6 AM - 12 PM)': 0,
+                            'Lunch Rush (12 PM - 3 PM)': 0,
+                            'Afternoon (3 PM - 6 PM)': 0,
+                            'Dinner Peak (6 PM - 9 PM)': 0,
+                            'Night (9 PM - 6 AM)': 0
+                          };
+                          
+                          const slotCounts = {
+                            'Morning (6 AM - 12 PM)': 0,
+                            'Lunch Rush (12 PM - 3 PM)': 0,
+                            'Afternoon (3 PM - 6 PM)': 0,
+                            'Dinner Peak (6 PM - 9 PM)': 0,
+                            'Night (9 PM - 6 AM)': 0
+                          };
+
+                          periodBills.forEach(b => {
+                            const cleanTime = b.time.replace('Today, ', '');
+                            const match = cleanTime.match(/(\d+):(\d+)\s*(AM|PM)/i);
+                            let slot = 'Afternoon (3 PM - 6 PM)';
+                            if (match) {
+                              let hour = parseInt(match[1]);
+                              const isPM = match[3].toUpperCase() === 'PM';
+                              if (isPM && hour < 12) hour += 12;
+                              if (!isPM && hour === 12) hour = 0;
+                              
+                              if (hour >= 6 && hour < 12) slot = 'Morning (6 AM - 12 PM)';
+                              else if (hour >= 12 && hour < 15) slot = 'Lunch Rush (12 PM - 3 PM)';
+                              else if (hour >= 15 && hour < 18) slot = 'Afternoon (3 PM - 6 PM)';
+                              else if (hour >= 18 && hour < 21) slot = 'Dinner Peak (6 PM - 9 PM)';
+                              else slot = 'Night (9 PM - 6 AM)';
+                            }
+                            slots[slot] += (b.total || b.amount || 0);
+                            slotCounts[slot] += 1;
+                          });
+
+                          let peakSlot = 'Dinner Peak (6 PM - 9 PM)';
+                          let maxRevenue = -1;
+                          Object.keys(slots).forEach(s => {
+                            if (slots[s] > maxRevenue) {
+                              maxRevenue = slots[s];
+                              peakSlot = s;
+                            }
+                          });
+
+                          const totalRevenue = Object.values(slots).reduce((a, b) => a + b, 0);
+
+                          return (
+                            <div className="space-y-4 text-xs font-semibold">
+                              {totalRevenue > 0 && (
+                                <div className="bg-purple-50/50 border border-purple-100 rounded-xl p-3 flex items-start gap-2.5">
+                                  <span className="text-base">🔥</span>
+                                  <div>
+                                    <h4 className="text-[11px] font-extrabold text-purple-800">Peak Sales Window</h4>
+                                    <p className="text-slate-600 text-[10px] mt-0.5 font-bold leading-normal">
+                                      Your busiest slot in this period is <strong className="text-purple-700">{peakSlot}</strong> contributing <strong className="text-purple-700">₹{maxRevenue.toLocaleString('en-IN')}</strong> ({totalRevenue > 0 ? Math.round((maxRevenue/totalRevenue)*100) : 0}% of sales).
+                                    </p>
+                                  </div>
+                                </div>
+                              )}
+                              
+                              <div className="space-y-3">
+                                {Object.keys(slots).map(s => {
+                                  const rev = slots[s];
+                                  const count = slotCounts[s];
+                                  const pct = totalRevenue > 0 ? Math.round((rev / totalRevenue) * 100) : 0;
+                                  const isPeak = s === peakSlot && totalRevenue > 0;
+                                  return (
+                                    <div key={s} className="space-y-1">
+                                      <div className="flex justify-between items-center text-slate-600">
+                                        <span className="flex items-center gap-1.5">
+                                          <span className={`w-2 h-2 rounded-full ${isPeak ? 'bg-purple-600' : 'bg-slate-400'}`} />
+                                          {s}
+                                        </span>
+                                        <span className="text-slate-400 font-bold">₹{rev.toLocaleString('en-IN')} ({count} orders)</span>
+                                      </div>
+                                      <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                        <div className={`h-full rounded-full transition-all duration-300 ${isPeak ? 'bg-purple-600' : 'bg-slate-400'}`} style={{ width: `${pct}%` }} />
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </section>
+
+                      {/* Ticket Size Distribution */}
+                      <section className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm space-y-4 animate-fadeIn">
+                        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                          <BarChart3 className="w-4 h-4 text-blue-600" /> Ticket Size Distribution
+                        </h3>
+
+                        {(() => {
+                          const reportsCutoff = getRelativeDateUtil(reportsFilter === 'day' ? 0 : reportsFilter === 'week' ? 6 : 29);
+                          const periodBills = recentBills.filter(b => b.date >= reportsCutoff);
+                          const totalTickets = periodBills.length;
+
+                          const smallTickets = periodBills.filter(b => b.total < 100);
+                          const mediumTickets = periodBills.filter(b => b.total >= 100 && b.total <= 400);
+                          const largeTickets = periodBills.filter(b => b.total > 400);
+
+                          const smallSales = smallTickets.reduce((s, b) => s + b.total, 0);
+                          const mediumSales = mediumTickets.reduce((s, b) => s + b.total, 0);
+                          const largeSales = largeTickets.reduce((s, b) => s + b.total, 0);
+
+                          const smallPct = totalTickets > 0 ? Math.round((smallTickets.length / totalTickets) * 100) : 0;
+                          const mediumPct = totalTickets > 0 ? Math.round((mediumTickets.length / totalTickets) * 100) : 0;
+                          const largePct = totalTickets > 0 ? Math.round((largeTickets.length / totalTickets) * 100) : 0;
+
+                          return (
+                            <div className="space-y-3.5 text-xs font-semibold">
+                              {/* Small Ticket */}
+                              <div className="space-y-1">
+                                <div className="flex justify-between items-center text-slate-600">
+                                  <span className="flex items-center gap-1.5">
+                                    <span className="w-2 h-2 rounded-full bg-sky-400" />
+                                    Small Orders (&lt; ₹100)
+                                  </span>
+                                  <span className="text-slate-400 font-bold">{smallTickets.length} orders ({smallPct}%)</span>
+                                </div>
+                                <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                  <div className="h-full bg-sky-400 rounded-full transition-all duration-300" style={{ width: `${smallPct}%` }} />
+                                </div>
+                              </div>
+
+                              {/* Medium Ticket */}
+                              <div className="space-y-1">
+                                <div className="flex justify-between items-center text-slate-600">
+                                  <span className="flex items-center gap-1.5">
+                                    <span className="w-2 h-2 rounded-full bg-blue-500" />
+                                    Medium Meals (₹100 - ₹400)
+                                  </span>
+                                  <span className="text-slate-400 font-bold">{mediumTickets.length} orders ({mediumPct}%)</span>
+                                </div>
+                                <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                  <div className="h-full bg-blue-500 rounded-full transition-all duration-300" style={{ width: `${mediumPct}%` }} />
+                                </div>
+                              </div>
+
+                              {/* Large Ticket */}
+                              <div className="space-y-1">
+                                <div className="flex justify-between items-center text-slate-600">
+                                  <span className="flex items-center gap-1.5">
+                                    <span className="w-2 h-2 rounded-full bg-indigo-600" />
+                                    Grand Feasts (&gt; ₹400)
+                                  </span>
+                                  <span className="text-slate-400 font-bold">{largeTickets.length} orders ({largePct}%)</span>
+                                </div>
+                                <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                  <div className="h-full bg-indigo-600 rounded-full transition-all duration-300" style={{ width: `${largePct}%` }} />
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </section>
+
                       {/* Top 5 Products Table */}
                       <section className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm space-y-4 animate-fadeIn">
                         <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
