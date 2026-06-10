@@ -395,8 +395,11 @@ export default function Dashboard() {
     }
   }, [sessionRole]);
 
-  // Current Logged-in Merchant Profile
   const [currentMerchant, setCurrentMerchant] = useState(null);
+  const isRestaurant = !!(currentMerchant && (
+    currentMerchant.category.toLowerCase().includes('restaurant') ||
+    currentMerchant.category.toLowerCase().includes('food hotel')
+  ));
 
   // Check Cookies on Load & Route change
   useEffect(() => {
@@ -803,8 +806,11 @@ export default function Dashboard() {
   const [historySearch, setHistorySearch] = useState('');
   const [historyDateFilter, setHistoryDateFilter] = useState(''); // ISO date string e.g. '2026-05-28'
   const [historyTab, setHistoryTab] = useState('bills'); // 'bills' | 'expenses'
+  const [billingDate, setBillingDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [expenseDate, setExpenseDate] = useState(() => new Date().toISOString().split('T')[0]);
 
   // --- Expenses State (State declared at top) ---
+
 
   // --- Add Expense Modal States ---
   const [showAddExpenseModal, setShowAddExpenseModal] = useState(false);
@@ -820,11 +826,14 @@ export default function Dashboard() {
       return;
     }
     const amt = parseInt(expenseAmount) || 0;
-    const todayISO = getRelativeDateUtil(0);
+    const targetDate = expenseDate || getRelativeDateUtil(0);
+    const isToday = targetDate === getRelativeDateUtil(0);
     const newExpense = {
       id: `EX-${String(expenses.length + 1).padStart(2, '0')}-${Date.now()}`,
-      date: todayISO,
-      time: `Today, ${new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`,
+      date: targetDate,
+      time: isToday 
+        ? `Today, ${new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`
+        : `${new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`,
       description: expenseDesc,
       category: expenseCategory,
       amount: amt,
@@ -946,6 +955,7 @@ export default function Dashboard() {
     }
     setOfferAmount('0'); // Default to 0
     setPaymentMethod('cash'); // Default to cash
+    setBillingDate(new Date().toISOString().split('T')[0]); // Default to today
     setShowPaymentModal(true); // Open checkout detail prompt
   };
 
@@ -959,13 +969,14 @@ export default function Dashboard() {
 
     const itemNamesList = JSON.stringify(billingCart.map(c => c.name));
     const paddedNum = String(invoiceCounter).padStart(2, '0');
-    const todayDateStr = new Date().toISOString().split('T')[0].replace(/-/g, '');
-    const newInvoiceId = `${activePrefix}-${todayDateStr}-${paddedNum}`;
+    const targetDate = billingDate || new Date().toISOString().split('T')[0];
+    const invoiceDateStr = targetDate.replace(/-/g, '');
+    const newInvoiceId = `${activePrefix}-${invoiceDateStr}-${paddedNum}`;
 
     const newBillItem = {
       id: newInvoiceId,
       time: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-      date: new Date().toISOString().split('T')[0],
+      date: targetDate,
       items: totalQty,
       total: finalTotal,
       amount: finalTotal,
@@ -1227,14 +1238,16 @@ export default function Dashboard() {
 
   const handleCreateProduct = (e) => {
     e.preventDefault();
-    if (!newStockName || !newStockBuyingPrice || !newStockSellingPrice || !newStockQty) {
+    if (!newStockName || !newStockBuyingPrice || !newStockSellingPrice || (!isRestaurant && !newStockQty)) {
       triggerToast(t('allFieldsRequired'), 'error');
       return;
     }
 
-    const finalNameEn = newStockName + (isSoldLoose ? " (per Kg)" : "");
-    const finalNameTa = (newStockNameTa.trim() || newStockName) + (isSoldLoose ? " (ஒரு கிலோ)" : "");
-    const finalNameUr = (newStockNameUr.trim() || newStockName) + (isSoldLoose ? " (فی کلو)" : "");
+    const finalIsLoose = isRestaurant ? false : isSoldLoose;
+
+    const finalNameEn = newStockName + (finalIsLoose ? " (per Kg)" : "");
+    const finalNameTa = (newStockNameTa.trim() || newStockName) + (finalIsLoose ? " (ஒரு கிலோ)" : "");
+    const finalNameUr = (newStockNameUr.trim() || newStockName) + (finalIsLoose ? " (فی کلو)" : "");
 
     const finalName = JSON.stringify({
       en: finalNameEn,
@@ -1244,8 +1257,8 @@ export default function Dashboard() {
 
     const sellingPrice = parseInt(newStockSellingPrice) || 0;
     const buyingPrice = parseInt(newStockBuyingPrice) || 0;
-    const openingStock = parseInt(newStockQty) || 50;
-    const minStock = isSoldLoose ? 5 : 8;
+    const openingStock = isRestaurant ? 999999 : (parseInt(newStockQty) || 50);
+    const minStock = isRestaurant ? 0 : (finalIsLoose ? 5 : 8);
 
     apiCall(`/api/shops/${currentMerchant.id}/inventory`, {
       method: 'POST',
@@ -1256,7 +1269,7 @@ export default function Dashboard() {
         price: sellingPrice,
         buyingPrice: buyingPrice,
         minStock: minStock,
-        isLoose: isSoldLoose
+        isLoose: finalIsLoose
       })
     })
       .then(data => {
@@ -2959,6 +2972,19 @@ export default function Dashboard() {
                               </div>
                             </div>
 
+                            {/* Billing Date */}
+                            <div className="space-y-2">
+                              <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block pl-0.5">Billing Date</label>
+                              <input 
+                                type="date" 
+                                required
+                                max={new Date().toISOString().split('T')[0]}
+                                value={billingDate}
+                                onChange={(e) => setBillingDate(e.target.value)}
+                                className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-100 text-sm focus:outline-none focus:border-blue-500 text-slate-800 font-semibold shadow-inner"
+                              />
+                            </div>
+
                             {/* Discount / Offer Field (Defaults to 0) */}
                             <div className="space-y-2">
                               <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block pl-0.5">Offer / Discount Amount</label>
@@ -3051,7 +3077,7 @@ export default function Dashboard() {
                   {activeTab === 'stock' && (
                     <div className="space-y-4 relative pb-20">
                       <div className="flex items-center justify-between">
-                        <h2 className="text-base font-extrabold text-slate-800">{t('inventoryStock')}</h2>
+                        <h2 className="text-base font-extrabold text-slate-800">{isRestaurant ? 'Menu Management' : t('inventoryStock')}</h2>
                       </div>
 
                       <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
@@ -3079,29 +3105,39 @@ export default function Dashboard() {
                                   <span className="text-xs font-semibold text-slate-500">
                                     {item.isLoose ? `₹${item.price}/Kg` : `₹${item.price} ${t('each')}`}
                                   </span>
-                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                                    isLow ? 'bg-amber-50 text-amber-600 border border-amber-100' : 'bg-slate-50 text-slate-500'
-                                  }`}>
-                                    {isLow ? t('lowStock') : t('goodStock')}
-                                  </span>
+                                  {isRestaurant ? (
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100">
+                                      Active Menu Item
+                                    </span>
+                                  ) : (
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                      isLow ? 'bg-amber-50 text-amber-600 border border-amber-100' : 'bg-slate-50 text-slate-500'
+                                    }`}>
+                                      {isLow ? t('lowStock') : t('goodStock')}
+                                    </span>
+                                  )}
                                 </div>
                               </div>
 
                               <div className="flex flex-col items-end gap-2">
-                                <div className="text-right">
-                                  <span className={`text-sm font-extrabold ${isLow ? 'text-amber-500' : 'text-slate-800'}`}>
-                                    {item.stock}{item.isLoose ? ' Kg' : ''}
-                                  </span>
-                                  <span className="text-[10px] text-slate-400 block mt-0.5">
-                                    {item.isLoose ? t('weight') : t('qty')}
-                                  </span>
-                                </div>
-                                <button 
-                                  onClick={() => handleQuickAddStock(item.id, item.name)}
-                                  className="min-h-[44px] min-w-[44px] bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-center cursor-pointer"
-                                >
-                                  <Plus className="w-4 h-4 text-slate-500" />
-                                </button>
+                                {!isRestaurant && (
+                                  <>
+                                    <div className="text-right">
+                                      <span className={`text-sm font-extrabold ${isLow ? 'text-amber-500' : 'text-slate-800'}`}>
+                                        {item.stock}{item.isLoose ? ' Kg' : ''}
+                                      </span>
+                                      <span className="text-[10px] text-slate-400 block mt-0.5">
+                                        {item.isLoose ? t('weight') : t('qty')}
+                                      </span>
+                                    </div>
+                                    <button 
+                                      onClick={() => handleQuickAddStock(item.id, item.name)}
+                                      className="min-h-[44px] min-w-[44px] bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-center cursor-pointer"
+                                    >
+                                      <Plus className="w-4 h-4 text-slate-500" />
+                                    </button>
+                                  </>
+                                )}
                               </div>
                             </div>
                           );
@@ -3629,7 +3665,7 @@ export default function Dashboard() {
                   </div>
 
                   {/* Category & Quantity */}
-                  <div className="grid grid-cols-2 gap-3.5">
+                  <div className={isRestaurant ? "space-y-1.5" : "grid grid-cols-2 gap-3.5"}>
                     <div className="space-y-1.5">
                       <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block pl-0.5">{t('category')}</label>
                       <select 
@@ -3643,41 +3679,45 @@ export default function Dashboard() {
                       </select>
                     </div>
 
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block pl-0.5">
-                        {isSoldLoose ? t('openingStockKg') : t('openingStockQty')}
-                      </label>
-                      <input 
-                        type="number" 
-                        required
-                        min="1"
-                        value={newStockQty}
-                        onChange={(e) => setNewStockQty(e.target.value)}
-                        className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-100 text-sm focus:outline-none focus:border-blue-500 text-slate-800 font-extrabold"
-                      />
-                    </div>
+                    {!isRestaurant && (
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block pl-0.5">
+                          {isSoldLoose ? t('openingStockKg') : t('openingStockQty')}
+                        </label>
+                        <input 
+                          type="number" 
+                          required
+                          min="1"
+                          value={newStockQty}
+                          onChange={(e) => setNewStockQty(e.target.value)}
+                          className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-100 text-sm focus:outline-none focus:border-blue-500 text-slate-800 font-extrabold"
+                        />
+                      </div>
+                    )}
                   </div>
 
                   {/* Sold Loose Toggle Selector */}
-                  <div className="flex items-center justify-between p-3.5 rounded-2xl bg-blue-50/40 border border-blue-100/50">
-                    <div className="flex flex-col space-y-0.5">
-                      <span className="text-xs font-extrabold text-blue-900">{t('soldLoose')}</span>
-                      <span className="text-[10px] text-slate-500 font-medium">{t('soldLooseHelp')}</span>
+                  {!isRestaurant && (
+                    <div className="flex items-center justify-between p-3.5 rounded-2xl bg-blue-50/40 border border-blue-100/50">
+                      <div className="flex flex-col space-y-0.5">
+                        <span className="text-xs font-extrabold text-blue-900">{t('soldLoose')}</span>
+                        <span className="text-[10px] text-slate-500 font-medium">{t('soldLooseHelp')}</span>
+                      </div>
+                      
+                      <button 
+                        type="button"
+                        onClick={() => setIsSoldLoose(!isSoldLoose)}
+                        className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl transition-all cursor-pointer"
+                        aria-label="Toggle sold loose weight based pricing"
+                      >
+                        {isSoldLoose ? (
+                          <ToggleRight className="w-8 h-8 text-blue-600" />
+                        ) : (
+                          <ToggleLeft className="w-8 h-8 text-slate-400" />
+                        )}
+                      </button>
                     </div>
-                    
-                    <button 
-                      type="button"
-                      onClick={() => setIsSoldLoose(!isSoldLoose)}
-                      className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl transition-all cursor-pointer"
-                      aria-label="Toggle sold loose weight based pricing"
-                    >
-                      {isSoldLoose ? (
-                        <ToggleRight className="w-8 h-8 text-blue-600" />
-                      ) : (
-                        <ToggleLeft className="w-8 h-8 text-slate-400" />
-                      )}
-                    </button>
-                  </div>
+                  )}
 
                   {/* Buying & Selling Price fields */}
                   <div className="grid grid-cols-2 gap-3.5">
@@ -4061,6 +4101,7 @@ export default function Dashboard() {
                     setExpenseAmount('');
                     setExpenseCategory('Utilities');
                     setExpensePayMethod('cash');
+                    setExpenseDate(new Date().toISOString().split('T')[0]);
                     setShowAddExpenseModal(true);
                   }}
                   className="absolute bottom-6 right-6 w-14 h-14 rounded-full bg-amber-600 hover:bg-amber-700 text-white flex items-center justify-center shadow-xl shadow-amber-500/25 hover:shadow-amber-500/35 active:scale-90 hover:scale-105 transition-all duration-200 z-50 border-4 border-white cursor-pointer"
@@ -4092,6 +4133,19 @@ export default function Dashboard() {
                 {/* Form fields */}
                 <form onSubmit={handleAddExpense} className="space-y-4">
                   
+                  {/* Expense Date */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block pl-0.5">Expense Date</label>
+                    <input 
+                      type="date" 
+                      required
+                      max={new Date().toISOString().split('T')[0]}
+                      value={expenseDate}
+                      onChange={(e) => setExpenseDate(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-100 text-sm focus:outline-none focus:border-amber-500 text-slate-800 font-semibold shadow-inner"
+                    />
+                  </div>
+
                   {/* Expense Description */}
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block pl-0.5">Description / Note</label>

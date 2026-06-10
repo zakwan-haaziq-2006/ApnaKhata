@@ -42,3 +42,5 @@ CLAUDE.md
 GEMINI.md
 QODER.md
 skills-lock.json
+
+/src/generated/prisma

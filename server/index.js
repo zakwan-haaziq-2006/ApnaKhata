@@ -402,6 +402,13 @@ app.post('/api/shops/:shopId/bills', async (req, res) => {
 
     // Verify stock levels first and lock the item rows
     let calculatedProfit = 0;
+    const { rows: shopRows } = await client.query(
+      `SELECT category FROM shops WHERE id = ?`,
+      [shopId]
+    );
+    const shopCategory = shopRows[0]?.category || 'Grocery';
+    const isRestaurantDb = shopCategory.toLowerCase().includes('restaurant') || shopCategory.toLowerCase().includes('food hotel');
+
     if (Array.isArray(cartItems)) {
       for (const ci of cartItems) {
         const { rows: itemRows } = await client.query(
@@ -415,19 +422,22 @@ app.post('/api/shops/:shopId/bills', async (req, res) => {
         }
         const item = itemRows[0];
         const currentStock = Number(item.stock);
-        if (currentStock < ci.qty) {
-          const err = new Error(`Insufficient stock for item "${item.name}".`);
-          err.statusCode = 400;
-          err.name = item.name;
-          err.available = currentStock;
-          throw err;
-        }
 
-        // Decrement stock
-        await client.query(
-          `UPDATE stock_items SET stock = stock - ? WHERE shop_id = ? AND id = ?`,
-          [ci.qty, shopId, ci.id]
-        );
+        if (!isRestaurantDb) {
+          if (currentStock < ci.qty) {
+            const err = new Error(`Insufficient stock for item "${item.name}".`);
+            err.statusCode = 400;
+            err.name = item.name;
+            err.available = currentStock;
+            throw err;
+          }
+
+          // Decrement stock
+          await client.query(
+            `UPDATE stock_items SET stock = stock - ? WHERE shop_id = ? AND id = ?`,
+            [ci.qty, shopId, ci.id]
+          );
+        }
 
         // Accumulate profit
         const sellingPrice = Number(item.price || 0);

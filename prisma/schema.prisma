@@ -1,0 +1,87 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+model bills {
+  id             String @id @db.VarChar(100)
+  shop_id        String @db.VarChar(100)
+  time           String @db.VarChar(100)
+  date           String @db.VarChar(50)
+  items          Int    @default(0)
+  total          Int    @default(0)
+  amount         Int    @default(0)
+  payment_method String @default("CASH") @db.VarChar(50)
+  discount       Int    @default(0)
+  items_list     String @db.Text
+  shops          shops  @relation(fields: [shop_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "bills_ibfk_1")
+
+  @@index([shop_id], map: "shop_id")
+}
+
+model expenses {
+  id             String @id @db.VarChar(100)
+  shop_id        String @db.VarChar(100)
+  date           String @db.VarChar(50)
+  time           String @db.VarChar(100)
+  description    String @db.VarChar(255)
+  category       String @db.VarChar(100)
+  amount         Int    @default(0)
+  payment_method String @default("CASH") @db.VarChar(50)
+  shops          shops  @relation(fields: [shop_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "expenses_ibfk_1")
+
+  @@index([shop_id], map: "shop_id")
+}
+
+model notifications {
+  id      BigInt  @id
+  shop_id String  @db.VarChar(100)
+  text    String  @db.Text
+  time    String  @db.VarChar(100)
+  read    Boolean @default(false)
+  type    String  @default("info") @db.VarChar(50)
+  shops   shops   @relation(fields: [shop_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "notifications_ibfk_1")
+
+  @@index([shop_id], map: "shop_id")
+}
+
+model shops {
+  id                  String          @id @db.VarChar(100)
+  username            String          @unique(map: "username") @db.VarChar(100)
+  password            String          @db.VarChar(255)
+  shop_name           String          @db.VarChar(255)
+  owner_name          String          @db.VarChar(255)
+  category            String          @default("Grocery") @db.VarChar(100)
+  subscription_status String          @default("active") @db.VarChar(50)
+  renewal_date        String?         @db.VarChar(100)
+  plan_duration       Int             @default(1)
+  plan_price          Int             @default(249)
+  sales               Int             @default(0)
+  profit              Int             @default(0)
+  expenses            Int             @default(0)
+  items_sold          Int             @default(0)
+  customers_visited   Int             @default(0)
+  bills               bills[]
+  expenses            expenses[]
+  notifications       notifications[]
+  stock_items         stock_items[]
+}
+
+model stock_items {
+  id           BigInt  @id
+  shop_id      String  @db.VarChar(100)
+  name         String  @db.VarChar(255)
+  category     String  @db.VarChar(100)
+  stock        Decimal @default(0.00) @db.Decimal(10, 2)
+  price        Int     @default(0)
+  buying_price Int     @default(0)
+  min_stock    Int     @default(5)
+  is_loose     Boolean @default(false)
+  shops        shops   @relation(fields: [shop_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "stock_items_ibfk_1")
+
+  @@index([shop_id], map: "shop_id")
+}
